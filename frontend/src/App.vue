@@ -273,7 +273,7 @@
             <div class="showdown-round">第 {{ gameState.roundNumber }}/16 局 | 累计总分</div>
             <div class="showdown-cumulative">
               <span v-for="(p, idx) in gameState.players" :key="'cum'+idx" style="margin:0 8px;">
-                {{ p.name }}: {{ gameState.totalScores[idx] + p.score }}
+                {{ p.name }}: {{ p.score }}
               </span>
             </div>
             <button class="btn-ready" @click="nextRoundOrFinish">{{ gameState.roundNumber >= 16 ? '🏆 查看最终排名' : '▶ 下一局' }}</button>
@@ -1079,7 +1079,7 @@ const nextRoundOrFinish = () => {
   if (gameState.roundNumber >= 16) {
     // 16局结束，显示总结
     const summary = gameState.players.map((p, i) =>
-      `${p.name}: 总分 ${gameState.totalScores[i]} 分`
+      `${p.name}: ${p.score} 分`
     ).join('\n');
     alert(`🏆 16局结束！最终排名：\n${summary}`);
     // 重置
@@ -1091,8 +1091,7 @@ const nextRoundOrFinish = () => {
     gameState.gamePhase = 'WAITING';
     return;
   }
-  // 保存累计分数并开始下一局
-  gameState.players.forEach((p, i) => { gameState.totalScores[i] += p.score; p.score = 0; });
+  // 分数自然累积，不重置（跨局累加）
   gameState.roundNumber++;
   gameState.dealerIndex = settlement.winnerIndex >= 0 ? settlement.winnerIndex : (gameState.dealerIndex + 1) % 4;
   // 单人模式：用 handleReady 触发第一局相同流程（NPC准备→自动开局）
@@ -1868,7 +1867,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .showdown-tiles { display: flex; gap: 2px; flex-wrap: wrap; flex: 1; }
 .showdown-tile-wrapper { position: relative; width: 24px; height: 34px; display: inline-block; }
 .showdown-tile-bg { position: absolute; width: 100%; height: 100%; z-index: 0; }
-.showdown-tile-face { position: absolute; top: 2px; left: calc(50% + 10px); transform: translateX(-50%); width: 19px; height: 26px; z-index: 2; }
+.showdown-tile-face { position: absolute; top: 2px; left: calc(50% + 50px); transform: translateX(-50%); width: 19px; height: 26px; z-index: 2; }
 .showdown-score { font-size: 14px; font-weight: bold; min-width: 45px; text-align: right; }
 .showdown-round { font-size: 13px; margin: 8px 0; color: #aaa; }
 
