@@ -44,7 +44,7 @@
             </div>
             <button class="mode-btn" @click="enterGame('single')">单人模式</button>
             <button class="mode-btn" @click="enterGame('multi')">联机模式</button>
-            <button class="mode-btn" @click="enterGame('test')">测试模式</button>
+            <button class="mode-btn test-mode-btn" @click="enterGame('test')" :disabled="isMobileDevice" :title="isMobileDevice ? '测试模式仅支持电脑端' : ''">测试模式</button>
             <button class="mode-btn" @click="enterGame('spectate')">观战模式</button>
           </div>
         </div>
@@ -405,6 +405,8 @@ const startTurnTimer = () => {
 const gameMode = ref('single'); // 'single' | 'multi' | 'spectate'
 // 是否在主菜单（控制移动端 CSS 旋转：菜单竖屏，其余横屏）
 const isInMenu = ref(true);
+// 是否移动端（禁用测试模式）
+const isMobileDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 const spectateView = ref(0); // 观战视角 (0=我, 1=下家, 2=对家, 3=上家)
 const multiState = reactive({
   roomId: '',
@@ -1074,8 +1076,8 @@ const nextRoundOrFinish = () => {
   settlement.payments = [0, 0, 0, 0];
   settlement.confirmed = [false, false, false, false];
   gameState.zhaNiaoResult = null;
-  if (gameState.roundNumber >= 4) {
-    // 4局结束，显示总结
+  if (gameState.roundNumber >= 16) {
+    // 16局结束，显示总结
     const summary = gameState.players.map((p, i) =>
       `${p.name}: 总分 ${gameState.totalScores[i]} 分`
     ).join('\n');
@@ -1086,13 +1088,17 @@ const nextRoundOrFinish = () => {
     gameState.players.forEach(p => p.score = 0);
     gameState.readyStatus = [false, false, false, false];
     gameState.dealerIndex = 0;
+    gameState.gamePhase = 'WAITING';
     return;
   }
   // 保存累计分数并开始下一局
   gameState.players.forEach((p, i) => { gameState.totalScores[i] += p.score; p.score = 0; });
   gameState.roundNumber++;
-  gameState.dealerIndex = settlement.winnerIndex; // 胡牌者下局当庄家
-  gameState.readyStatus = [false, false, false, false];
+  gameState.dealerIndex = settlement.winnerIndex >= 0 ? settlement.winnerIndex : (gameState.dealerIndex + 1) % 4;
+  // 单人模式：直接开始下一局
+  if (gameMode.value === 'single') {
+    startRound();
+  }
 };
 
 const startRound = () => {
@@ -1724,6 +1730,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .mode-btn { display: block; width: 260px; margin: 12px auto; padding: 14px; font-size: 18px; font-weight: bold; border: 2px solid #555; border-radius: 16px; cursor: pointer; background: rgba(255,255,255,0.1); color: white; transition: 0.2s; }
 .mode-btn:hover { background: rgba(255,255,255,0.2); border-color: #ffd700; }
 .mode-btn:active { background: rgba(255,255,255,0.3); transform: scale(0.95); }
+.mode-btn:disabled { background: rgba(255,255,255,0.03); border-color: #333; color: #555; cursor: not-allowed; }
 
 /* 移动端主菜单：竖屏大字大按钮 */
 @media screen and (max-width: 1024px) and (orientation: portrait) {
@@ -1826,7 +1833,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .showdown-tiles { display: flex; gap: 2px; flex-wrap: wrap; flex: 1; }
 .showdown-tile-wrapper { position: relative; width: 24px; height: 34px; display: inline-block; }
 .showdown-tile-bg { position: absolute; width: 100%; height: 100%; z-index: 0; }
-.showdown-tile-face { position: absolute; top: 1px; left: 50%; transform: translateX(-50%); width: 19px; height: 26px; z-index: 2; }
+.showdown-tile-face { position: absolute; top: 2px; left: calc(50% + 5px); transform: translateX(-50%); width: 19px; height: 26px; z-index: 2; }
 .showdown-score { font-size: 14px; font-weight: bold; min-width: 45px; text-align: right; }
 .showdown-round { font-size: 13px; margin: 8px 0; color: #aaa; }
 
