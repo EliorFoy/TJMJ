@@ -1,8 +1,8 @@
 <template>
-  <div class="app-container" :class="{ 'mobile-debug': showMobileFrame }">
-    <!-- 调试：手机边框切换 -->
-    <button class="debug-toggle" @click="showMobileFrame = !showMobileFrame" title="切换手机边框">{{ showMobileFrame ? '📱' : '🖥' }}</button>
+  <div class="app-container">
+    <!-- BGM 控制 -->
     <button class="music-toggle" @click="toggleMusic" :title="musicPlaying ? '暂停音乐' : '播放音乐'">{{ musicPlaying ? '🔊' : '🔇' }}</button>
+    <audio ref="bgMusic" loop src="/TJMJ/bgm.mp3" preload="auto"></audio>
 
     <div id="game-wrapper">
       <div class="mahjong-desk" :class="{ 'in-menu': isInMenu }">
@@ -29,7 +29,6 @@
             <button class="mode-btn" @click="enterGame('test')">测试模式</button>
             <button class="mode-btn" @click="enterGame('spectate')">观战模式</button>
           </div>
-          <audio ref="bgMusic" loop style="display:none" src=""></audio>
         </div>
 
         <!-- 观战模式：输入房间号 -->
@@ -343,17 +342,30 @@ const gameState = reactive({
   ]
 });
 
-const showMobileFrame = ref(false);
 const bgMusic = ref(null);
 const musicPlaying = ref(false);
+
+// 尝试自动播放 BGM（需要用户交互，浏览器会拒绝纯自动播放）
+const tryAutoPlay = () => {
+  const audio = bgMusic.value;
+  if (!audio || musicPlaying.value) return;
+  audio.play().then(() => {
+    musicPlaying.value = true;
+  }).catch(() => {
+    // 浏览器阻止自动播放，等用户交互后再试
+  });
+};
 
 const toggleMusic = () => {
   const audio = bgMusic.value;
   if (!audio) return;
-  if (musicPlaying.value) { audio.pause(); musicPlaying.value = false; }
-  else {
-    if (!audio.src || audio.src === location.href) audio.src = '/TJMJ/bgm.mp3';
-    audio.play().then(() => musicPlaying.value = true).catch(() => musicPlaying.value = false);
+  if (musicPlaying.value) {
+    audio.pause();
+    musicPlaying.value = false;
+  } else {
+    audio.play().then(() => {
+      musicPlaying.value = true;
+    }).catch(() => {});
   }
 };
 
@@ -534,6 +546,7 @@ const exitFullscreen = () => {
 const enterGame = (mode) => {
   gameMode.value = mode;
   isInMenu.value = false; // 离开主菜单立即触发 CSS 横屏旋转
+  tryAutoPlay(); // 利用用户点击手势启动 BGM
   lockLandscape();
   requestFullscreen();
   if (mode === 'single') {
@@ -1667,11 +1680,11 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
     justify-content: center;
     align-items: center;
     width: 100vw;
-    height: 100vh;
+    height: 100dvh;
   }
   .mahjong-desk {
-    --sw: calc((100vw - 12px) / 960);
-    --sh: calc((100vh - 12px) / 533);
+    --sw: calc(100vw / 960);
+    --sh: calc(100dvh / 533);
     transform: scale(min(var(--sw), var(--sh)));
     transform-origin: center center;
   }
@@ -1684,12 +1697,13 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
     justify-content: center;
     align-items: center;
     width: 100vw;
-    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
   }
   /* 主菜单不旋转，保持竖屏自然显示 */
   .mahjong-desk:not(.in-menu) {
-    --sw: calc((100vh - 12px) / 960);
-    --sh: calc((100vw - 12px) / 533);
+    --sw: calc(100vw / 533);
+    --sh: calc(100dvh / 960);
     transform: rotate(90deg) scale(min(var(--sw), var(--sh)));
     transform-origin: center center;
   }
@@ -1729,17 +1743,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .dihu-btn.drag { background: linear-gradient(145deg, #ff9800, #f57c00); }
 .dihu-btn:active { transform: scale(0.95); }
 
-/* ===== 调试：手机边框 ===== */
-.debug-toggle { position: fixed; top: 5px; right: 5px; z-index: 99999; background: #333; color: white; border: 2px solid #666; border-radius: 8px; padding: 4px 8px; font-size: 18px; cursor: pointer; opacity: 0.5; }
-.debug-toggle:hover { opacity: 1; }
-.music-toggle { position: fixed; top: 5px; right: 50px; z-index: 99999; background: #333; color: white; border: 2px solid #666; border-radius: 8px; padding: 4px 8px; font-size: 18px; cursor: pointer; opacity: 0.5; }
+/* ===== BGM 音乐按钮 ===== */
+.music-toggle { position: fixed; top: 5px; right: 5px; z-index: 99999; background: #333; color: white; border: 2px solid #666; border-radius: 8px; padding: 4px 8px; font-size: 18px; cursor: pointer; opacity: 0.5; }
 .music-toggle:hover { opacity: 1; }
-.mobile-debug .app-container { background: #222; }
-.mobile-debug #game-wrapper {
-  /* 全屏 + 手机边框装饰（不限制尺寸，只加视觉边框） */
-  border: 16px solid #111;
-  border-radius: 32px;
-  box-shadow: 0 0 0 4px #555, 0 0 60px rgba(0,0,0,0.95), inset 0 0 0 2px #2a2a2a;
-  /* 不再限制 max-width / max-height，让响应式缩放正常工作 */
-}
 </style>
