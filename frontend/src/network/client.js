@@ -68,8 +68,17 @@ export const disconnect = () => {
   netState.playerIndex = -1;
 };
 
-// 发送消息
+// 发送消息（内置节流，防止过快点击导致断连）
+const _lastSend = {};
+const _THROTTLE = 200; // 同类型消息最小间隔200ms
 export const send = (msg) => {
+  const now = Date.now();
+  const last = _lastSend[msg.type] || 0;
+  if (now - last < _THROTTLE) {
+    console.log('[client] 节流跳过:', msg.type, `(距上次${now - last}ms)`);
+    return;
+  }
+  _lastSend[msg.type] = now;
   console.log('[client] send:', msg.type, 'ws状态:', ws?.readyState);
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(msg));
