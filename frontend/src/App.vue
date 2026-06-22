@@ -184,7 +184,7 @@
                </div>
             </div>
 
-            <div v-for="(tile, index) in gameState.handTiles" :key="index" class="hand-tile-wrapper" :class="{ 'selected': gameState.selectedTileIndex === index, 'new-drawn-tile': isNewDrawnTile(index), 'dragging': dragIndex === index, 'drag-over': dragOverIndex === index }" draggable="true" @click="onTapTile(index)" @dragstart="onDragStart(index, $event)" @dragover.prevent="onDragOver(index)" @dragleave="onDragLeave(index)" @drop="onDrop(index)" @dragend="onDragEnd" @touchstart="onTouchStart(index, $event)" @touchmove.prevent="onTouchMove($event)" @touchend="onTouchEnd(index)">
+            <div v-for="(tile, index) in gameState.handTiles" :key="index" class="hand-tile-wrapper" :class="{ 'selected': gameState.selectedTileIndex === index, 'new-drawn-tile': isNewDrawnTile(index), 'dragging': dragIndex === index, 'drag-over': dragOverIndex === index }" draggable="true" @click="onTapTile(index)" @dragstart="onDragStart(index, $event)" @dragover.prevent="onDragOver(index)" @dragleave="onDragLeave(index)" @drop="onDrop(index)" @dragend="onDragEnd" @touchstart="onTouchStart(index, $event)" @touchmove.prevent="onTouchMove($event)" @touchend.prevent="onTouchEnd(index)">
               <img :src="getImg('3d/hand_1.png')" class="tile-bg" />
               <img :src="getImg(`tiles/${tile}.png`)" class="tile-face" />
             </div>
@@ -748,17 +748,16 @@ const setupVoiceWithRoom = async () => {
   const myIdx = netState.playerIndex;
   myPlayerIndexForChat.value = myIdx;
   netState.players.forEach((p, i) => {
-    if (i !== myIdx && !peerConnections.has(i)) {
-      createPeerConnection(i);
+    if (i !== myIdx && p.connected && !peerConnections.has(i)) {
+      createPeerConnection(i, myIdx < i); // 仅序号小的一方发起offer
     }
   });
 };
 
-const createPeerConnection = (targetIdx) => {
+const createPeerConnection = (targetIdx, isOfferer = true) => {
   const pc = new RTCPeerConnection(rtcConfig);
   peerConnections.set(targetIdx, pc);
 
-  // 添加本地音频流
   localStream.value?.getTracks().forEach(track => {
     pc.addTrack(track, localStream.value);
   });
@@ -770,25 +769,34 @@ const createPeerConnection = (targetIdx) => {
   };
 
   pc.ontrack = (e) => {
-    // 远端音频自动播放
-    const audio = new Audio();
-    audio.srcObject = e.streams[0];
-    audio.play().catch(() => {});
+    // 远端音频
+    try {
+      const remoteStream = new MediaStream();
+      remoteStream.addTrack(e.track);
+      const audio = new Audio();
+      audio.srcObject = remoteStream;
+      audio.autoplay = true;
+      audio.play().catch(() => {});
+    } catch(err) { console.log('音频播放失败:', err); }
   };
 
-  // 创建 offer（发起方）
-  pc.createOffer().then(offer => {
-    pc.setLocalDescription(offer);
-    send({ type: 'webrtc_offer', to: targetIdx, data: offer });
-  }).catch(console.error);
+  // 只由 playerIndex 较小的一方创建 offer（避免双方同时 offer 冲突）
+  if (isOfferer) {
+    pc.createOffer().then(offer => {
+      pc.setLocalDescription(offer);
+      send({ type: 'webrtc_offer', to: targetIdx, data: offer });
+    }).catch(console.error);
+  }
 };
 
 const handleWebrtcSignal = (msg) => {
   const { type, from, data } = msg;
   let pc = peerConnections.get(from);
+  const myIdx = netState.playerIndex;
 
   if (type === 'webrtc_offer') {
     if (!pc) {
+      // 接收 offer 方：只创建 answer，不创建 offer
       pc = new RTCPeerConnection(rtcConfig);
       peerConnections.set(from, pc);
       localStream.value?.getTracks().forEach(track => {
@@ -798,9 +806,14 @@ const handleWebrtcSignal = (msg) => {
         if (e.candidate) send({ type: 'webrtc_ice', to: from, data: e.candidate });
       };
       pc.ontrack = (e) => {
-        const audio = new Audio();
-        audio.srcObject = e.streams[0];
-        audio.play().catch(() => {});
+        try {
+          const remoteStream = new MediaStream();
+          remoteStream.addTrack(e.track);
+          const audio = new Audio();
+          audio.srcObject = remoteStream;
+          audio.autoplay = true;
+          audio.play().catch(() => {});
+        } catch(err) {}
       };
     }
     pc.setRemoteDescription(new RTCSessionDescription(data));
@@ -2088,8 +2101,8 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .chat-input { flex: 1; padding: 10px 14px; font-size: 16px; border: 2px solid #555; border-radius: 20px; background: rgba(255,255,255,0.1); color: white; outline: none; }
 .chat-input:focus { border-color: #ffd700; }
 .chat-send-btn { padding: 10px 18px; font-size: 14px; font-weight: bold; background: linear-gradient(145deg, #2196F3, #1565C0); border: none; border-radius: 20px; color: white; cursor: pointer; }
-/* 手机端：聊天框旋转90度匹配横屏游戏 */
+/* 手机端：聊天框保持底部不旋转（和键盘一起） */
 @media screen and (max-width: 1024px) and (orientation: portrait) {
-  .chat-input-bar { bottom: auto; top: 50%; right: -40px; left: auto; transform: translateY(-50%) rotate(90deg); transform-origin: center center; border-radius: 12px; width: 60vh; max-width: 400px; }
+  .chat-input-bar { bottom: 0; top: auto; right: auto; left: 0; transform: none; border-radius: 0; width: 100%; }
 }
 </style>
