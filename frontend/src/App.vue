@@ -176,7 +176,7 @@
                </div>
             </div>
 
-            <div v-for="(tile, index) in gameState.handTiles" :key="index" class="hand-tile-wrapper" :class="{ 'selected': gameState.selectedTileIndex === index, 'new-drawn-tile': isNewDrawnTile(index), 'dragging': dragIndex === index, 'drag-over': dragOverIndex === index }" draggable="true" @click="onTapTile(index)" @dragstart="onDragStart(index, $event)" @dragover.prevent="onDragOver(index)" @dragleave="onDragLeave(index)" @drop="onDrop(index)" @dragend="onDragEnd">
+            <div v-for="(tile, index) in gameState.handTiles" :key="index" class="hand-tile-wrapper" :class="{ 'selected': gameState.selectedTileIndex === index, 'new-drawn-tile': isNewDrawnTile(index), 'dragging': dragIndex === index, 'drag-over': dragOverIndex === index }" draggable="true" @click="onTapTile(index)" @dragstart="onDragStart(index, $event)" @dragover.prevent="onDragOver(index)" @dragleave="onDragLeave(index)" @drop="onDrop(index)" @dragend="onDragEnd" @touchstart.prevent="onTouchStart(index, $event)" @touchmove.prevent="onTouchMove($event)" @touchend.prevent="onTouchEnd">
               <img :src="getImg('3d/hand_1.png')" class="tile-bg" />
               <img :src="getImg(`tiles/${tile}.png`)" class="tile-face" />
             </div>
@@ -1095,9 +1095,11 @@ const nextRoundOrFinish = () => {
   gameState.players.forEach((p, i) => { gameState.totalScores[i] += p.score; p.score = 0; });
   gameState.roundNumber++;
   gameState.dealerIndex = settlement.winnerIndex >= 0 ? settlement.winnerIndex : (gameState.dealerIndex + 1) % 4;
-  // 单人模式：直接开始下一局
+  // 单人模式：用 handleReady 触发第一局相同流程（NPC准备→自动开局）
   if (gameMode.value === 'single') {
-    startRound();
+    gameState.gamePhase = 'WAITING';
+    // 延迟让结算UI先消失
+    setTimeout(() => handleReady(), 200);
   }
 };
 
@@ -1261,6 +1263,39 @@ const onDrop = (index) => {
 };
 
 const onDragEnd = () => {
+  dragIndex.value = -1;
+  dragOverIndex.value = -1;
+};
+
+// ============ 手机端触摸拖拽手牌 ============
+let touchActive = false;
+const onTouchStart = (index, e) => {
+  touchActive = true;
+  dragIndex.value = index;
+};
+const onTouchMove = (e) => {
+  if (!touchActive || dragIndex.value === -1) return;
+  const touch = e.touches[0];
+  const tiles = document.querySelectorAll('.hand-tile-wrapper');
+  let target = dragIndex.value;
+  tiles.forEach((el, i) => {
+    const r = el.getBoundingClientRect();
+    if (touch.clientX >= r.left && touch.clientX <= r.right &&
+        touch.clientY >= r.top && touch.clientY <= r.bottom) {
+      target = i;
+    }
+  });
+  if (target !== dragIndex.value && target >= 0 && target < gameState.handTiles.length) {
+    const tilesArr = gameState.handTiles;
+    const dragged = tilesArr[dragIndex.value];
+    tilesArr.splice(dragIndex.value, 1);
+    tilesArr.splice(target, 0, dragged);
+    dragIndex.value = target;
+    if (gameState.selectedTileIndex === dragIndex.value) gameState.selectedTileIndex = target;
+  }
+};
+const onTouchEnd = () => {
+  touchActive = false;
   dragIndex.value = -1;
   dragOverIndex.value = -1;
 };
