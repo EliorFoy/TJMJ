@@ -623,7 +623,7 @@ const updateGameScale = () => {
     desk.style.left = '';
     desk.style.marginLeft = '';
     desk.style.marginTop = '';
-    const s = Math.min(vw / 960, vh / 533);
+    const s = Math.min(vw / 960, vh / 533) * 0.85;
     desk.style.transform = `scale(${s})`;
     desk.style.transformOrigin = 'center center';
   }
