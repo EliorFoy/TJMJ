@@ -24,10 +24,10 @@
               <span class="anime-emoji a5">🎵</span>
               <span class="anime-emoji a6">✨</span>
             </div>
-            <button class="mode-btn" @click="gameMode='single'; handleReady()">单人模式</button>
-            <button class="mode-btn" @click="gameMode='multi'">联机模式</button>
-            <button class="mode-btn" @click="openTestMode">测试模式</button>
-            <button class="mode-btn" @click="gameMode='spectate'">观战模式</button>
+            <button class="mode-btn" @click="enterGame('single')">单人模式</button>
+            <button class="mode-btn" @click="enterGame('multi')">联机模式</button>
+            <button class="mode-btn" @click="enterGame('test')">测试模式</button>
+            <button class="mode-btn" @click="enterGame('spectate')">观战模式</button>
           </div>
           <audio ref="bgMusic" loop style="display:none" src=""></audio>
         </div>
@@ -39,7 +39,7 @@
             <input v-model="spectateRoomInput" placeholder="输入4位房间号" class="lobby-input room-code" maxlength="4" @input="spectateRoomInput = spectateRoomInput.replace(/[^0-9]/g,''); if(spectateRoomInput.length===4) joinSpectate()" />
             <button class="lobby-btn join" @click="joinSpectate" :disabled="spectateRoomInput.length !== 4">观战</button>
             <div v-if="multiState.error" class="lobby-error">{{ multiState.error }}</div>
-            <button class="lobby-back" @click="gameMode='single'">← 返回</button>
+            <button class="lobby-back" @click="backToMenu()">← 返回</button>
           </div>
         </div>
 
@@ -56,7 +56,7 @@
               {{ multiState.joining ? '加入中...' : '加入房间' }}
             </button>
             <div v-if="multiState.error" class="lobby-error">{{ multiState.error }}</div>
-            <button class="lobby-back" @click="gameMode='single'">← 返回</button>
+            <button class="lobby-back" @click="backToMenu()">← 返回</button>
           </div>
 
           <div v-else class="lobby-dialog">
@@ -71,7 +71,7 @@
               </div>
             </div>
             <div class="lobby-info">邀请朋友输入房间号加入，4人到齐后自动开始</div>
-            <button class="lobby-back" @click="leaveRoom">← 离开房间</button>
+            <button class="lobby-back" @click="leaveRoom(); backToMenu()">← 离开房间</button>
           </div>
         </div>
 
@@ -484,6 +484,70 @@ const handleReady = () => {
       }, Math.random() * 1500 + 500);
     });
   }
+};
+
+// ============ 移动端横屏/全屏控制 ============
+const lockLandscape = async () => {
+  try {
+    if (screen.orientation && screen.orientation.lock) {
+      await screen.orientation.lock('landscape');
+    }
+  } catch (e) {
+    // 部分浏览器不支持，静默失败，CSS fallback 兜底
+  }
+};
+
+const unlockOrientation = () => {
+  try {
+    if (screen.orientation && screen.orientation.unlock) {
+      screen.orientation.unlock();
+    }
+  } catch (e) {}
+};
+
+const requestFullscreen = async () => {
+  try {
+    const el = document.documentElement;
+    if (el.requestFullscreen) {
+      await el.requestFullscreen();
+    } else if (el.webkitRequestFullscreen) {
+      await el.webkitRequestFullscreen();
+    }
+  } catch (e) {
+    // 静默失败
+  }
+};
+
+const exitFullscreen = () => {
+  try {
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else if (document.webkitFullscreenElement) {
+      document.webkitExitFullscreen();
+    }
+  } catch (e) {}
+};
+
+// 进入游戏模式：设置模式 + 横屏锁定 + 全屏
+const enterGame = (mode) => {
+  gameMode.value = mode;
+  lockLandscape();
+  requestFullscreen();
+  if (mode === 'single') {
+    handleReady();
+  } else if (mode === 'test') {
+    openTestMode();
+  } else if (mode === 'spectate') {
+    // 观战模式打开后等用户输入房间号
+  }
+  // multi 模式：显示联机大厅，用户自行操作
+};
+
+// 返回主菜单：解锁方向 + 退出全屏
+const backToMenu = () => {
+  gameMode.value = 'single';
+  unlockOrientation();
+  exitFullscreen();
 };
 
 const spectateRoomInput = ref('');
@@ -1381,6 +1445,33 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .mode-dialog { transform: scale(1.1); }
 .mode-btn { display: block; width: 260px; margin: 12px auto; padding: 14px; font-size: 18px; font-weight: bold; border: 2px solid #555; border-radius: 16px; cursor: pointer; background: rgba(255,255,255,0.1); color: white; transition: 0.2s; }
 .mode-btn:hover { background: rgba(255,255,255,0.2); border-color: #ffd700; }
+.mode-btn:active { background: rgba(255,255,255,0.3); transform: scale(0.95); }
+
+/* 移动端主菜单：竖屏大字大按钮 */
+@media screen and (max-width: 1024px) and (orientation: portrait) {
+  .mode-select-overlay {
+    /* 主菜单不旋转，正常竖屏显示 */
+  }
+  .mode-dialog {
+    transform: none;
+    padding: 20px;
+  }
+  .mode-dialog h2 {
+    font-size: 48px;
+    margin-bottom: 40px;
+  }
+  .mode-btn {
+    width: 80vw;
+    max-width: 360px;
+    padding: 18px;
+    font-size: 22px;
+    margin: 16px auto;
+    border-radius: 20px;
+  }
+  .anime-emoji {
+    font-size: 48px;
+  }
+}
 
 /* 赛博动画 */
 .mode-anime { display: flex; justify-content: center; gap: 12px; margin-bottom: 20px; }
@@ -1580,7 +1671,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
   }
 }
 
-/* 手机竖屏：旋转90度强制横屏 */
+/* 手机竖屏：旋转90度强制横屏（仅游戏进行中，主菜单不旋转）*/
 @media screen and (max-width: 1024px) and (orientation: portrait) {
   #game-wrapper {
     display: flex;
@@ -1589,7 +1680,8 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
     width: 100vw;
     height: 100vh;
   }
-  .mahjong-desk {
+  /* 主菜单不旋转，保持竖屏自然显示 */
+  .mahjong-desk:not(:has(.mode-select-overlay)) {
     --sw: calc((100vh - 12px) / 960);
     --sh: calc((100vw - 12px) / 533);
     transform: rotate(90deg) scale(min(var(--sw), var(--sh)));
