@@ -7,6 +7,7 @@ export class HuCalculator {
    * @param {Number} wangTile 王牌(癞子)
    * @param {Number} diTile 地牌(用于判断地胡)
    * @param {Boolean} isFirstTurn 是否是开局第一轮(用于判断黑天胡/起手胡)
+   * @returns {{ canHu: boolean, type: string, score: number, hasWang: boolean, canCatchCannon: boolean, canDrag: boolean }}
    */
   static checkHu(handTiles, wangTile, diTile = null, isFirstTurn = false) {
     let normalTiles = [];
@@ -22,12 +23,17 @@ export class HuCalculator {
     });
     normalTiles.sort((a, b) => a - b);
 
+    const hasWang = wangCount > 0;
+    // 核心规则：有癞子不能抓炮（只能自摸），无癞子可以抓炮
+    const canCatchCannon = !hasWang;
+    const baseFields = { hasWang, canCatchCannon, canDrag: false };
+
     // 1. 拦截黑天胡 (首轮、14张、无王、无258、无一句话)
     if (isFirstTurn && handTiles.length === 14 && wangCount === 0) {
        let hasJiang = handTiles.some(t => is258(t));
        let hasSentence = this.hasAnySentence(handTiles);
        if (!hasJiang && !hasSentence) {
-          return { canHu: true, type: "黑天胡", score: 6 };
+          return { canHu: true, type: "黑天胡", score: 6, ...baseFields };
        }
     }
 
@@ -38,7 +44,7 @@ export class HuCalculator {
     let normalHuRes = this.checkNormalHu(normalTiles, wangCount);
     if (normalHuRes.canHu) {
         isHu = true;
-        isPengPeng = normalHuRes.isPengPeng; // 顺便查出是不是碰碰胡
+        isPengPeng = normalHuRes.isPengPeng;
     }
 
     // 3. 检查七小对 (特殊门子)
@@ -48,26 +54,26 @@ export class HuCalculator {
         if (is7Pairs) isHu = true;
     }
 
-    if (!isHu) return { canHu: false, type: "", score: 0 };
+    if (!isHu) return { canHu: false, type: "", score: 0, ...baseFields };
 
     // --- 4. 算分与加番规则 ---
     let isJiangJiang = handTiles.every(t => t === wangTile || is258(t));
     let isQingYiSe = new Set(normalTiles.map(t => Math.floor(t / 10))).size === 1;
 
     // 顶级胡法优先判定
-    if (wangCount === 4) return { canHu: true, type: "天天胡", score: 15 };
-    if (wangCount === 3) return { canHu: true, type: "天胡", score: 9 };
-    if (diCount === 3) return { canHu: true, type: "地胡", score: 6 }; // 地胡带拖后续在具体游戏流转中加分
+    if (wangCount === 4) return { canHu: true, type: "天天胡", score: 15, ...baseFields };
+    if (wangCount === 3) return { canHu: true, type: "天胡", score: 9, ...baseFields };
+    if (diCount === 3) return { canHu: true, type: "地胡", score: 6, canDrag: true, ...baseFields };
 
     // 门子胡法判定
-    if (isJiangJiang) return { canHu: true, type: "将将胡", score: 6 };
-    if (isQingYiSe) return { canHu: true, type: "清一色", score: 6 };
-    if (is7Pairs) return { canHu: true, type: "七小对", score: 6 };
-    if (isPengPeng) return { canHu: true, type: "碰碰胡", score: 6 };
+    if (isJiangJiang) return { canHu: true, type: "将将胡", score: 6, ...baseFields };
+    if (isQingYiSe) return { canHu: true, type: "清一色", score: 6, ...baseFields };
+    if (is7Pairs) return { canHu: true, type: "七小对", score: 6, ...baseFields };
+    if (isPengPeng) return { canHu: true, type: "碰碰胡", score: 6, ...baseFields };
 
     // 基础胡法判定
-    if (wangCount === 0) return { canHu: true, type: "硬庄", score: 6 };
-    return { canHu: true, type: "平胡", score: 3 };
+    if (!hasWang) return { canHu: true, type: "硬庄", score: 6, ...baseFields };
+    return { canHu: true, type: "平胡", score: 3, ...baseFields };
   }
 
   // 常规胡法检测
@@ -166,5 +172,37 @@ export class HuCalculator {
         if (tiles.includes(t+1) && tiles.includes(t+2)) return true;
      }
      return false;
+  }
+
+  /**
+   * 起手检测：庄家起手胡 / 闲家起手报听
+   * @param {Array} handTiles 手牌
+   * @param {Number} wangTile 王牌
+   * @param {Boolean} isDealer 是否庄家
+   * @returns {{ canFirstTurnHu: boolean, canFirstTurnTing: boolean, type: string, score: number }}
+   */
+  static checkFirstTurn(handTiles, wangTile, isDealer) {
+    if (isDealer && handTiles.length === 14) {
+      // 庄家：检查14张能否直接胡
+      const result = this.checkHu(handTiles, wangTile, null, true);
+      if (result.canHu) {
+        return { canFirstTurnHu: true, canFirstTurnTing: false, type: "起手胡", score: 6 };
+      }
+    }
+    if (!isDealer && handTiles.length === 13) {
+      // 闲家：检查13张是否听牌（差一张胡）
+      // 枚举每张可能摸到的牌
+      const suits = [1, 2, 3];
+      for (let suit of suits) {
+        for (let num = 1; num <= 9; num++) {
+          const testHand = [...handTiles, suit * 10 + num];
+          const result = this.checkHu(testHand, wangTile, null, false);
+          if (result.canHu) {
+            return { canFirstTurnHu: false, canFirstTurnTing: true, type: "起手报听", score: 6 };
+          }
+        }
+      }
+    }
+    return { canFirstTurnHu: false, canFirstTurnTing: false, type: "", score: 0 };
   }
 }

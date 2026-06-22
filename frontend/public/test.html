@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>测试模式 - 桃江麻将</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #111; overflow: hidden; display: flex; justify-content: center; align-items: center; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; width: 100vw; height: 100vh; gap: 0; }
+  .cell { overflow: hidden; }
+  iframe { width: 149.25%; height: 149.25%; border: none; transform: scale(0.67); transform-origin: 0 0; }
+</style>
+</head>
+<body>
+<div class="grid">
+  <div class="cell"><iframe src="/TJMJ/?auto_join=8888&name=NPC1"></iframe></div>
+  <div class="cell"><iframe src="/TJMJ/?auto_join=8888&name=NPC2"></iframe></div>
+  <div class="cell"><iframe src="/TJMJ/?auto_join=8888&name=NPC3"></iframe></div>
+  <div class="cell"><iframe src="/TJMJ/?auto_join=8888&name=NPC4"></iframe></div>
+</div>
+</body>
+</html>
