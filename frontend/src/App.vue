@@ -1070,6 +1070,9 @@ const multiPass = () => send({ type: 'pass' });
 const multiEmoji = (icon, target) => send({ type: 'emoji', icon, target });
 
 // 下一局或结束
+// 防御性分数保存（跨局不丢失）
+let _savedScores = null;
+
 const nextRoundOrFinish = () => {
   gameState.showdownHands = null;
   settlement.active = false;
@@ -1077,32 +1080,36 @@ const nextRoundOrFinish = () => {
   settlement.confirmed = [false, false, false, false];
   gameState.zhaNiaoResult = null;
   if (gameState.roundNumber >= 16) {
-    // 16局结束，显示总结
     const summary = gameState.players.map((p, i) =>
       `${p.name}: ${p.score} 分`
     ).join('\n');
     alert(`🏆 16局结束！最终排名：\n${summary}`);
-    // 重置
     gameState.roundNumber = 1;
     gameState.totalScores = [0, 0, 0, 0];
     gameState.players.forEach(p => p.score = 0);
     gameState.readyStatus = [false, false, false, false];
     gameState.dealerIndex = 0;
     gameState.gamePhase = 'WAITING';
+    _savedScores = null;
     return;
   }
-  // 分数自然累积，不重置（跨局累加）
+  // 保存本轮结束后的分数
+  _savedScores = gameState.players.map(p => p.score);
   gameState.roundNumber++;
   gameState.dealerIndex = settlement.winnerIndex >= 0 ? settlement.winnerIndex : (gameState.dealerIndex + 1) % 4;
-  // 单人模式：用 handleReady 触发第一局相同流程（NPC准备→自动开局）
   if (gameMode.value === 'single') {
     gameState.gamePhase = 'WAITING';
-    // 延迟让结算UI先消失
     setTimeout(() => handleReady(), 200);
   }
 };
 
 const startRound = () => {
+  // 防御性恢复跨局分数
+  if (_savedScores) {
+    _savedScores.forEach((s, i) => { gameState.players[i].score = s; });
+    _savedScores = null;
+  }
+
   actionState.isWaiting = false;
   actionState.targetTile = null;
   actionState.canChi = actionState.canPeng = actionState.canGang = actionState.canHu = false;
@@ -1867,7 +1874,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .showdown-tiles { display: flex; gap: 2px; flex-wrap: wrap; flex: 1; }
 .showdown-tile-wrapper { position: relative; width: 24px; height: 34px; display: inline-block; }
 .showdown-tile-bg { position: absolute; width: 100%; height: 100%; z-index: 0; }
-.showdown-tile-face { position: absolute; top: 2px; left: calc(50% + 50px); transform: translateX(-50%); width: 19px; height: 26px; z-index: 2; }
+.showdown-tile-face { position: absolute; top: 2px; left: calc(50% + 65px); transform: translateX(-50%); width: 19px; height: 26px; z-index: 2; }
 .showdown-score { font-size: 14px; font-weight: bold; min-width: 45px; text-align: right; }
 .showdown-round { font-size: 13px; margin: 8px 0; color: #aaa; }
 
