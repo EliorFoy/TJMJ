@@ -1868,7 +1868,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .showdown-tiles { display: flex; gap: 2px; flex-wrap: wrap; flex: 1; }
 .showdown-tile-wrapper { position: relative; width: 24px; height: 34px; display: inline-block; }
 .showdown-tile-bg { position: absolute; width: 100%; height: 100%; z-index: 0; }
-.showdown-tile-face { position: absolute; top: 2px; left: calc(50% + 5px); transform: translateX(-50%); width: 19px; height: 26px; z-index: 2; }
+.showdown-tile-face { position: absolute; top: 2px; left: calc(50% + 10px); transform: translateX(-50%); width: 19px; height: 26px; z-index: 2; }
 .showdown-score { font-size: 14px; font-weight: bold; min-width: 45px; text-align: right; }
 .showdown-round { font-size: 13px; margin: 8px 0; color: #aaa; }
 
