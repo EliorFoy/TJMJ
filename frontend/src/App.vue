@@ -52,8 +52,9 @@
             </div>
             <button class="mode-btn" @click="enterGame('single')">单人模式</button>
             <button class="mode-btn" @click="enterGame('multi')">联机模式</button>
-            <button class="mode-btn test-mode-btn" @click="enterGame('test')" :disabled="isMobileDevice" :title="isMobileDevice ? '测试模式仅支持电脑端' : ''">测试模式</button>
             <button class="mode-btn" @click="enterGame('spectate')">观战模式</button>
+            <button class="mode-btn" disabled title="即将推出">AI比赛模式</button>
+            <button class="mode-btn test-mode-btn" @click="enterGame('test')" :disabled="isMobileDevice" :title="isMobileDevice ? '测试模式仅支持电脑端' : ''">测试模式</button>
           </div>
         </div>
 
@@ -371,7 +372,7 @@ const gameState = reactive({
 const bgMusic = ref(null);
 const musicPlaying = ref(false);
 
-// 尝试自动播放 BGM（需要用户交互，浏览器会拒绝纯自动播放）
+// BGM：首页自动播放，进游戏自动关闭
 const tryAutoPlay = () => {
   const audio = bgMusic.value;
   if (!audio || musicPlaying.value) return;
@@ -380,6 +381,13 @@ const tryAutoPlay = () => {
   }).catch(() => {
     // 浏览器阻止自动播放，等用户交互后再试
   });
+};
+
+const stopMusic = () => {
+  const audio = bgMusic.value;
+  if (!audio) return;
+  audio.pause();
+  musicPlaying.value = false;
 };
 
 const toggleMusic = () => {
@@ -575,7 +583,7 @@ const enterGame = (mode) => {
   gameMode.value = mode;
   isInMenu.value = false; // 离开主菜单立即触发 CSS 横屏旋转
   updateGameScale(); // 计算手机端缩放比
-  tryAutoPlay(); // 利用用户点击手势启动 BGM
+  stopMusic(); // 进入对局关闭BGM
   lockLandscape();
   requestFullscreen();
   if (mode === 'single') {
@@ -595,6 +603,7 @@ const backToMenu = () => {
   unlockOrientation();
   exitFullscreen();
   updateGameScale(); // 恢复桌面缩放
+  tryAutoPlay(); // 回到首页恢复BGM
   // 清理语音连接
   closeAllPeerConnections();
 };
@@ -843,6 +852,14 @@ const openTestMode = () => {
 const autoConnecting = ref(false);
 onMounted(async () => {
   updateGameScale();
+  // 首页BGM：首次用户点击时启动（浏览器要求用户手势才能播放）
+  const startBgmOnTouch = () => {
+    tryAutoPlay();
+    document.removeEventListener('click', startBgmOnTouch);
+    document.removeEventListener('touchstart', startBgmOnTouch);
+  };
+  document.addEventListener('click', startBgmOnTouch);
+  document.addEventListener('touchstart', startBgmOnTouch);
   const params = new URLSearchParams(location.search);
   const autoJoin = params.get('auto_join');
   if (autoJoin) {
