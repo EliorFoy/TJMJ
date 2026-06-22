@@ -3,12 +3,17 @@
     <audio ref="bgMusic" loop src="/TJMJ/bgm.mp3" preload="auto"></audio>
 
     <div id="game-wrapper">
-      <div class="mahjong-desk" :class="{ 'in-menu': isInMenu }" :style="{ '--game-scale': gameScale }">
+      <div class="mahjong-desk" :class="{ 'in-menu': isInMenu }">
 
         <!-- BGM / 语音 / 聊天 控制（游戏区域内部） -->
         <div class="top-controls">
           <button class="ctrl-btn" @click="toggleMusic" :title="musicPlaying ? '暂停音乐' : '播放音乐'">{{ musicPlaying ? '🔊' : '🔇' }}</button>
-          <button class="ctrl-btn" @click="toggleMic" :title="micEnabled ? '关闭麦克风' : '打开麦克风'">{{ micEnabled ? '🎙️' : '🔕' }}</button>
+          <button class="ctrl-btn mic-btn" @click="toggleMic" :title="micEnabled ? '关闭麦克风' : '打开麦克风'">
+            <span class="mic-icon">{{ micEnabled ? '🎙️' : '🔕' }}</span>
+            <span class="mic-bars" v-if="micEnabled">
+              <span v-for="n in 5" :key="n" class="mic-bar" :class="{ active: micLevel >= n * 20 }"></span>
+            </span>
+          </button>
           <button class="ctrl-btn" @click="toggleChat" title="聊天">{{ showChatInput ? '💬' : '💭' }}</button>
         </div>
 
@@ -585,23 +590,31 @@ const backToMenu = () => {
 };
 
 // ============ 动态缩放（桌面 + 手机通用）============
-const gameScale = ref(1);
 const updateGameScale = () => {
+  const desk = document.querySelector('.mahjong-desk');
+  if (!desk) return;
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const isPortrait = vw < vh && vw <= 1024;
-  let s;
+
   if (isPortrait && !isInMenu.value) {
-    // 手机竖屏旋转90°后：视觉宽=533, 视觉高=960
-    s = Math.min(vw / 533, vh / 960, 1);
+    // 手机竖屏游戏：旋转90°，视觉宽=533, 视觉高=960
+    const s = Math.min(vw / 533, vh / 960);
+    desk.style.transform = `rotate(90deg) scale(${s})`;
+    desk.style.transformOrigin = 'center center';
+  } else if (isPortrait) {
+    // 手机竖屏主菜单：不旋转不缩放
+    desk.style.transform = '';
+    desk.style.transformOrigin = '';
   } else {
-    // 桌面 / 手机横屏 / 主菜单：不旋转，视觉宽=960, 视觉高=533
-    s = Math.min(vw / 960, vh / 533, 1);
+    // 桌面：125% 缩放（fill + 25%）
+    const s = Math.min(vw / 960, vh / 533) * 1.25;
+    desk.style.transform = `scale(${s})`;
+    desk.style.transformOrigin = 'center center';
   }
-  gameScale.value = s;
 };
 window.addEventListener('resize', updateGameScale);
-window.addEventListener('orientationchange', () => setTimeout(updateGameScale, 300));
+window.addEventListener('orientationchange', () => setTimeout(updateGameScale, 400));
 
 // ============ 文字聊天 ============
 const showChatInput = ref(false);
@@ -641,11 +654,40 @@ const addChatMessage = (msg) => {
 
 // ============ WebRTC 语音 ============
 const micEnabled = ref(false);
+const micLevel = ref(0); // 0-100 音量百分比
 const localStream = ref(null);
 const peerConnections = new Map(); // playerIndex → RTCPeerConnection
+let audioContext = null;
+let analyserNode = null;
+let micLevelTimer = null;
 
 const rtcConfig = {
   iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+};
+
+// 启动音量监测
+const startMicLevelMonitor = (stream) => {
+  try {
+    if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    analyserNode = audioContext.createAnalyser();
+    analyserNode.fftSize = 256;
+    const source = audioContext.createMediaStreamSource(stream);
+    source.connect(analyserNode);
+    const dataArray = new Uint8Array(analyserNode.frequencyBinCount);
+    const tick = () => {
+      if (!micEnabled.value) { micLevel.value = 0; return; }
+      analyserNode.getByteFrequencyData(dataArray);
+      const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+      micLevel.value = Math.min(100, Math.round(avg * 2));
+      micLevelTimer = requestAnimationFrame(tick);
+    };
+    tick();
+  } catch (e) { /* 静默 */ }
+};
+
+const stopMicLevelMonitor = () => {
+  if (micLevelTimer) { cancelAnimationFrame(micLevelTimer); micLevelTimer = null; }
+  micLevel.value = 0;
 };
 
 const toggleMic = async () => {
@@ -653,14 +695,16 @@ const toggleMic = async () => {
     // 关闭麦克风
     localStream.value?.getAudioTracks().forEach(t => t.enabled = false);
     micEnabled.value = false;
+    stopMicLevelMonitor();
   } else {
     try {
       if (!localStream.value) {
         localStream.value = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        startMicLevelMonitor(localStream.value);
       }
       localStream.value.getAudioTracks().forEach(t => t.enabled = true);
       micEnabled.value = true;
-      // 如果在房间中，创建/更新 peer 连接
+      startMicLevelMonitor(localStream.value);
       if (netState.roomId) {
         setupVoiceWithRoom();
       }
@@ -1645,7 +1689,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 }
 
 /* 麻将桌：固定尺寸，通过 transform scale 适配屏幕 */
-.mahjong-desk { position: relative; width: 960px; height: 533px; background-color: #215c32; overflow: hidden; box-shadow: 0 0 30px #000; color: white; border: 4px solid #1a472a; border-radius: 10px; transform: scale(var(--game-scale, 1)); transform-origin: center center; }
+.mahjong-desk { position: relative; width: 960px; height: 533px; background-color: #215c32; overflow: hidden; box-shadow: 0 0 30px #000; color: white; border: 4px solid #1a472a; border-radius: 10px; }
 
 /* 准备遮罩层 */
 .ready-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 999; }
@@ -1811,7 +1855,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .exposed-area { display: flex; gap: 8px; margin-right: 15px; }
 .exposed-group { display: flex; gap: 2px; border-radius: 5px; }
 .exposed-tile { width: 34px; height: 48px; }
-.exposed-tile .center-tile-face { top: 2px; width: 28px; height: 28px; transform: translateX(-40%); }
+.exposed-tile .center-tile-face { top: 2px; left: 50%; width: 28px; height: 28px; transform: translateX(-50%); }
 
 .hand-tile-wrapper { position: relative; width: 44px; height: 64px; cursor: pointer; transition: 0.2s; margin-left: 0.5px; }
 .hand-tile-wrapper:first-child { margin-left: 0; }
@@ -1863,7 +1907,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .discard-pool { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; display: grid; grid-template-columns: repeat(12, 26px); grid-template-rows: repeat(6, 38px); gap: 1px; justify-content: center; align-content: center; }
 .center-tile-wrapper { position: relative; width: 28px; height: 38px; z-index: 1; }
 .center-tile-bg { position: absolute; width: 100%; height: 100%; z-index: 0; }
-.center-tile-face { position: absolute; top: 1px; left: 90%; transform: translateX(-40%); width: 22px; height: 30px; z-index: 2; }
+.center-tile-face { position: absolute; top: 3px; left: 50%; transform: translateX(-50%); width: 22px; height: 28px; z-index: 2; }
 /* 重叠的牌增加z-index和阴影 */
 .center-tile-wrapper:nth-child(n+15) { z-index: 3; }
 .center-tile-wrapper:nth-child(n+25) { z-index: 4; }
@@ -1882,11 +1926,10 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
   }
 }
 
-/* 手机竖屏：旋转90度强制横屏（仅游戏进行中，主菜单不旋转）*/
+/* 手机竖屏：JS 动态控制 transform，CSS 只负责布局容器 */
 @media screen and (max-width: 1024px) and (orientation: portrait) {
   .mahjong-desk:not(.in-menu) {
-    transform: rotate(90deg) scale(var(--game-scale, 0.7));
-    transform-origin: center center;
+    /* transform 由 updateGameScale() 直接设置 */
   }
 }
 
@@ -1926,8 +1969,19 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 
 /* ===== 顶部控制栏（BGM / 语音 / 聊天，在游戏区域内） ===== */
 .top-controls { position: absolute; top: 6px; right: 80px; z-index: 99999; display: flex; gap: 3px; }
-.ctrl-btn { background: rgba(0,0,0,0.4); color: white; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 2px 6px; font-size: 15px; cursor: pointer; }
+.ctrl-btn { background: rgba(0,0,0,0.4); color: white; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 2px 6px; font-size: 15px; cursor: pointer; display: flex; align-items: center; gap: 2px; }
 .ctrl-btn:hover { background: rgba(0,0,0,0.7); }
+/* 麦克风按钮 + 音量条 */
+.mic-btn { flex-direction: column; gap: 1px; min-width: 28px; }
+.mic-icon { line-height: 1; }
+.mic-bars { display: flex; gap: 1px; height: 8px; align-items: flex-end; }
+.mic-bar { width: 3px; height: 3px; background: #444; border-radius: 1px; transition: height 0.1s, background 0.1s; }
+.mic-bar.active { background: #4CAF50; }
+.mic-bar:nth-child(1).active { height: 4px; }
+.mic-bar:nth-child(2).active { height: 5px; }
+.mic-bar:nth-child(3).active { height: 6px; }
+.mic-bar:nth-child(4).active { height: 7px; }
+.mic-bar:nth-child(5).active { height: 8px; }
 
 /* ===== 聊天消息气泡（在游戏区域内） ===== */
 .chat-bubbles { position: absolute; top: 36px; right: 8px; z-index: 99998; display: flex; flex-direction: column; gap: 4px; max-width: 60%; pointer-events: none; }
