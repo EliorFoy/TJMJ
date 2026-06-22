@@ -2,19 +2,27 @@
   <div class="app-container">
     <audio ref="bgMusic" loop src="/TJMJ/bgm.mp3" preload="auto"></audio>
 
+    <!-- 聊天输入框（屏幕底部，始终在最上层） -->
+    <div class="chat-input-bar" v-if="showChatInput">
+      <input ref="chatInputRef" v-model="chatText" @keyup.enter="sendChat" placeholder="输入消息..." class="chat-input" maxlength="50" />
+      <button class="chat-send-btn" @click="sendChat">发送</button>
+    </div>
+
     <div id="game-wrapper">
       <div class="mahjong-desk" :class="{ 'in-menu': isInMenu }">
 
-        <!-- BGM / 语音 / 聊天 控制（游戏区域内部） -->
-        <div class="top-controls">
+        <!-- 控制按钮：首页只显示BGM居中，游戏中显示全部 -->
+        <div class="top-controls" :class="{ 'menu-only': isInMenu }">
           <button class="ctrl-btn" @click="toggleMusic" :title="musicPlaying ? '暂停音乐' : '播放音乐'">{{ musicPlaying ? '🔊' : '🔇' }}</button>
-          <button class="ctrl-btn mic-btn" @click="toggleMic" :title="micEnabled ? '关闭麦克风' : '打开麦克风'">
-            <span class="mic-icon">{{ micEnabled ? '🎙️' : '🔕' }}</span>
-            <span class="mic-bars" v-if="micEnabled">
-              <span v-for="n in 5" :key="n" class="mic-bar" :class="{ active: micLevel >= n * 20 }"></span>
-            </span>
-          </button>
-          <button class="ctrl-btn" @click="toggleChat" title="聊天">{{ showChatInput ? '💬' : '💭' }}</button>
+          <template v-if="!isInMenu">
+            <button class="ctrl-btn mic-btn" @click="toggleMic" :title="micEnabled ? '关闭麦克风' : '打开麦克风'">
+              <span class="mic-icon">{{ micEnabled ? '🎙️' : '🔕' }}</span>
+              <span class="mic-bars" v-if="micEnabled">
+                <span v-for="n in 5" :key="n" class="mic-bar" :class="{ active: micLevel >= n * 20 }"></span>
+              </span>
+            </button>
+            <button class="ctrl-btn" @click="toggleChat" title="聊天">{{ showChatInput ? '💬' : '💭' }}</button>
+          </template>
         </div>
 
         <!-- 弹幕聊天 -->
@@ -176,7 +184,7 @@
                </div>
             </div>
 
-            <div v-for="(tile, index) in gameState.handTiles" :key="index" class="hand-tile-wrapper" :class="{ 'selected': gameState.selectedTileIndex === index, 'new-drawn-tile': isNewDrawnTile(index), 'dragging': dragIndex === index, 'drag-over': dragOverIndex === index }" draggable="true" @click="onTapTile(index)" @dragstart="onDragStart(index, $event)" @dragover.prevent="onDragOver(index)" @dragleave="onDragLeave(index)" @drop="onDrop(index)" @dragend="onDragEnd" @touchstart.prevent="onTouchStart(index, $event)" @touchmove.prevent="onTouchMove($event)" @touchend.prevent="onTouchEnd">
+            <div v-for="(tile, index) in gameState.handTiles" :key="index" class="hand-tile-wrapper" :class="{ 'selected': gameState.selectedTileIndex === index, 'new-drawn-tile': isNewDrawnTile(index), 'dragging': dragIndex === index, 'drag-over': dragOverIndex === index }" draggable="true" @click="onTapTile(index)" @dragstart="onDragStart(index, $event)" @dragover.prevent="onDragOver(index)" @dragleave="onDragLeave(index)" @drop="onDrop(index)" @dragend="onDragEnd" @touchstart="onTouchStart(index, $event)" @touchmove.prevent="onTouchMove($event)" @touchend="onTouchEnd(index)">
               <img :src="getImg('3d/hand_1.png')" class="tile-bg" />
               <img :src="getImg(`tiles/${tile}.png`)" class="tile-face" />
             </div>
@@ -1278,20 +1286,29 @@ const onDragEnd = () => {
 };
 
 // ============ 手机端触摸拖拽手牌 ============
-let touchActive = false;
+let touchStartTime = 0;
+let touchStartPos = [0, 0];
+let touchMoved = false;
 const onTouchStart = (index, e) => {
-  touchActive = true;
+  touchMoved = false;
+  touchStartTime = Date.now();
+  const t = e.touches[0];
+  touchStartPos = [t.clientX, t.clientY];
   dragIndex.value = index;
 };
 const onTouchMove = (e) => {
-  if (!touchActive || dragIndex.value === -1) return;
-  const touch = e.touches[0];
+  const t = e.touches[0];
+  const dx = t.clientX - touchStartPos[0];
+  const dy = t.clientY - touchStartPos[1];
+  if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return; // 阈值防抖
+  touchMoved = true;
+  if (dragIndex.value === -1) return;
   const tiles = document.querySelectorAll('.hand-tile-wrapper');
   let target = dragIndex.value;
   tiles.forEach((el, i) => {
     const r = el.getBoundingClientRect();
-    if (touch.clientX >= r.left && touch.clientX <= r.right &&
-        touch.clientY >= r.top && touch.clientY <= r.bottom) {
+    if (t.clientX >= r.left && t.clientX <= r.right &&
+        t.clientY >= r.top && t.clientY <= r.bottom) {
       target = i;
     }
   });
@@ -1304,8 +1321,11 @@ const onTouchMove = (e) => {
     if (gameState.selectedTileIndex === dragIndex.value) gameState.selectedTileIndex = target;
   }
 };
-const onTouchEnd = () => {
-  touchActive = false;
+const onTouchEnd = (index) => {
+  // 如果没有拖动（轻点），触发点击出牌
+  if (!touchMoved && Date.now() - touchStartTime < 300) {
+    onTapTile(index);
+  }
   dragIndex.value = -1;
   dragOverIndex.value = -1;
 };
@@ -2035,9 +2055,16 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .dihu-btn:active { transform: scale(0.95); }
 
 /* ===== 顶部控制栏（BGM / 语音 / 聊天，在游戏区域内） ===== */
-.top-controls { position: absolute; top: 6px; right: 80px; z-index: 99999; display: flex; gap: 3px; }
+.top-controls { position: absolute; top: 28px; right: 100px; z-index: 99999; display: flex; gap: 3px; }
+/* 首页：BGM按钮居中 */
+.top-controls.menu-only { right: 50%; transform: translateX(50%); gap: 0; }
 .ctrl-btn { background: rgba(0,0,0,0.4); color: white; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 2px 6px; font-size: 15px; cursor: pointer; display: flex; align-items: center; gap: 2px; }
 .ctrl-btn:hover { background: rgba(0,0,0,0.7); }
+
+/* 手机首页：隐藏绿色游戏框 */
+@media screen and (max-width: 1024px) and (orientation: portrait) {
+  .mahjong-desk.in-menu { background-color: transparent; border-color: transparent; box-shadow: none; }
+}
 /* 麦克风按钮 + 音量条 */
 .mic-btn { flex-direction: column; gap: 1px; min-width: 28px; }
 .mic-icon { line-height: 1; }
