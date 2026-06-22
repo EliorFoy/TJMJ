@@ -128,8 +128,23 @@ wss.on('connection', (ws) => {
 
       case 'emoji': {
         if (!myRoom) return;
-        // 广播给所有人，每人看到动画从发送者飞到目标
         myRoom.broadcast({ type: 'emoji_from', from: myPlayerIndex, to: msg.target, icon: msg.icon });
+        break;
+      }
+
+      // === 文字聊天 ===
+      case 'chat': {
+        if (!myRoom || !msg.text) return;
+        myRoom.broadcast({ type: 'chat', from: myPlayerIndex, fromName: msg.fromName || ('玩家' + (myPlayerIndex + 1)), text: msg.text });
+        break;
+      }
+
+      // === WebRTC 语音信令中继 ===
+      case 'webrtc_offer':
+      case 'webrtc_answer':
+      case 'webrtc_ice': {
+        if (!myRoom || msg.to == null) return;
+        myRoom.sendTo(msg.to, { type: msg.type, from: myPlayerIndex, data: msg.data });
         break;
       }
     }

@@ -1,11 +1,29 @@
 <template>
   <div class="app-container">
-    <!-- BGM 控制 -->
-    <button class="music-toggle" @click="toggleMusic" :title="musicPlaying ? '暂停音乐' : '播放音乐'">{{ musicPlaying ? '🔊' : '🔇' }}</button>
+    <!-- BGM / 语音 / 聊天 控制 -->
+    <div class="top-controls">
+      <button class="ctrl-btn" @click="toggleMusic" :title="musicPlaying ? '暂停音乐' : '播放音乐'">{{ musicPlaying ? '🔊' : '🔇' }}</button>
+      <button class="ctrl-btn" @click="toggleMic" :title="micEnabled ? '关闭麦克风' : '打开麦克风'">{{ micEnabled ? '🎙️' : '🔕' }}</button>
+      <button class="ctrl-btn" @click="toggleChat" title="聊天">{{ showChatInput ? '💬' : '💭' }}</button>
+    </div>
     <audio ref="bgMusic" loop src="/TJMJ/bgm.mp3" preload="auto"></audio>
 
+    <!-- 聊天消息气泡 -->
+    <div class="chat-bubbles" v-if="chatMessages.length > 0">
+      <div v-for="m in chatMessages" :key="m.id" class="chat-bubble" :class="{ 'chat-self': m.from === myPlayerIndexForChat }">
+        <span class="chat-name">{{ m.fromName }}</span>
+        <span class="chat-text">{{ m.text }}</span>
+      </div>
+    </div>
+
+    <!-- 聊天输入框 -->
+    <div class="chat-input-bar" v-if="showChatInput && !isInMenu">
+      <input ref="chatInputRef" v-model="chatText" @keyup.enter="sendChat" placeholder="输入消息..." class="chat-input" maxlength="50" />
+      <button class="chat-send-btn" @click="sendChat">发送</button>
+    </div>
+
     <div id="game-wrapper">
-      <div class="mahjong-desk" :class="{ 'in-menu': isInMenu }">
+      <div class="mahjong-desk" :class="{ 'in-menu': isInMenu }" :style="{ '--game-scale': gameScale }">
         
         <!-- 自动连接中 -->
         <div class="ready-overlay" v-if="autoConnecting">
@@ -546,6 +564,7 @@ const exitFullscreen = () => {
 const enterGame = (mode) => {
   gameMode.value = mode;
   isInMenu.value = false; // 离开主菜单立即触发 CSS 横屏旋转
+  updateGameScale(); // 计算手机端缩放比
   tryAutoPlay(); // 利用用户点击手势启动 BGM
   lockLandscape();
   requestFullscreen();
@@ -565,6 +584,165 @@ const backToMenu = () => {
   isInMenu.value = true;
   unlockOrientation();
   exitFullscreen();
+  // 清理语音连接
+  closeAllPeerConnections();
+};
+
+// ============ 手机端动态缩放 ============
+const gameScale = ref(1);
+const updateGameScale = () => {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  // 旋转90°后：视觉宽=533, 视觉高=960
+  const sw = (vw - 8) / 533;
+  const sh = (vh - 8) / 960;
+  gameScale.value = Math.min(sw, sh, 1);
+};
+window.addEventListener('resize', updateGameScale);
+window.addEventListener('orientationchange', () => setTimeout(updateGameScale, 300));
+
+// ============ 文字聊天 ============
+const showChatInput = ref(false);
+const chatText = ref('');
+const chatInputRef = ref(null);
+const chatMessages = ref([]); // { id, from, fromName, text }
+let chatMsgId = 0;
+const myPlayerIndexForChat = ref(-1);
+
+const toggleChat = () => {
+  showChatInput.value = !showChatInput.value;
+  if (showChatInput.value) {
+    setTimeout(() => chatInputRef.value?.focus(), 100);
+  }
+};
+
+const sendChat = () => {
+  const text = chatText.value.trim();
+  if (!text) { showChatInput.value = false; return; }
+  // 本地消息
+  const msg = { id: ++chatMsgId, from: myPlayerIndexForChat.value, fromName: multiState.playerName || '我', text };
+  addChatMessage(msg);
+  // 发送到服务器
+  if (netState.roomId) {
+    send({ type: 'chat', text, fromName: multiState.playerName });
+  }
+  chatText.value = '';
+  showChatInput.value = false;
+};
+
+const addChatMessage = (msg) => {
+  chatMessages.value.push(msg);
+  setTimeout(() => {
+    chatMessages.value = chatMessages.value.filter(m => m.id !== msg.id);
+  }, 5000);
+};
+
+// ============ WebRTC 语音 ============
+const micEnabled = ref(false);
+const localStream = ref(null);
+const peerConnections = new Map(); // playerIndex → RTCPeerConnection
+
+const rtcConfig = {
+  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+};
+
+const toggleMic = async () => {
+  if (micEnabled.value) {
+    // 关闭麦克风
+    localStream.value?.getAudioTracks().forEach(t => t.enabled = false);
+    micEnabled.value = false;
+  } else {
+    try {
+      if (!localStream.value) {
+        localStream.value = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      }
+      localStream.value.getAudioTracks().forEach(t => t.enabled = true);
+      micEnabled.value = true;
+      // 如果在房间中，创建/更新 peer 连接
+      if (netState.roomId) {
+        setupVoiceWithRoom();
+      }
+    } catch (e) {
+      console.log('麦克风权限被拒绝:', e);
+    }
+  }
+};
+
+const setupVoiceWithRoom = async () => {
+  if (!localStream.value) return;
+  const myIdx = netState.playerIndex;
+  myPlayerIndexForChat.value = myIdx;
+  netState.players.forEach((p, i) => {
+    if (i !== myIdx && !peerConnections.has(i)) {
+      createPeerConnection(i);
+    }
+  });
+};
+
+const createPeerConnection = (targetIdx) => {
+  const pc = new RTCPeerConnection(rtcConfig);
+  peerConnections.set(targetIdx, pc);
+
+  // 添加本地音频流
+  localStream.value?.getTracks().forEach(track => {
+    pc.addTrack(track, localStream.value);
+  });
+
+  pc.onicecandidate = (e) => {
+    if (e.candidate) {
+      send({ type: 'webrtc_ice', to: targetIdx, data: e.candidate });
+    }
+  };
+
+  pc.ontrack = (e) => {
+    // 远端音频自动播放
+    const audio = new Audio();
+    audio.srcObject = e.streams[0];
+    audio.play().catch(() => {});
+  };
+
+  // 创建 offer（发起方）
+  pc.createOffer().then(offer => {
+    pc.setLocalDescription(offer);
+    send({ type: 'webrtc_offer', to: targetIdx, data: offer });
+  }).catch(console.error);
+};
+
+const handleWebrtcSignal = (msg) => {
+  const { type, from, data } = msg;
+  let pc = peerConnections.get(from);
+
+  if (type === 'webrtc_offer') {
+    if (!pc) {
+      pc = new RTCPeerConnection(rtcConfig);
+      peerConnections.set(from, pc);
+      localStream.value?.getTracks().forEach(track => {
+        pc.addTrack(track, localStream.value);
+      });
+      pc.onicecandidate = (e) => {
+        if (e.candidate) send({ type: 'webrtc_ice', to: from, data: e.candidate });
+      };
+      pc.ontrack = (e) => {
+        const audio = new Audio();
+        audio.srcObject = e.streams[0];
+        audio.play().catch(() => {});
+      };
+    }
+    pc.setRemoteDescription(new RTCSessionDescription(data));
+    pc.createAnswer().then(answer => {
+      pc.setLocalDescription(answer);
+      send({ type: 'webrtc_answer', to: from, data: answer });
+    }).catch(console.error);
+  } else if (type === 'webrtc_answer') {
+    if (pc) pc.setRemoteDescription(new RTCSessionDescription(data)).catch(console.error);
+  } else if (type === 'webrtc_ice') {
+    if (pc && data) pc.addIceCandidate(new RTCIceCandidate(data)).catch(console.error);
+  }
+};
+
+const closeAllPeerConnections = () => {
+  peerConnections.forEach(pc => pc.close());
+  peerConnections.clear();
 };
 
 const spectateRoomInput = ref('');
@@ -659,11 +837,16 @@ const setupNetworkListeners = () => {
   on('room_created', (msg) => {
     multiState.roomId = msg.roomId;
     gameState.readyStatus[0] = true;
+    myPlayerIndexForChat.value = msg.playerIndex;
+    if (micEnabled.value) setupVoiceWithRoom();
   });
 
   on('room_joined', (msg) => {
     multiState.roomId = msg.roomId;
     gameState.readyStatus[0] = true;
+    myPlayerIndexForChat.value = msg.playerIndex;
+    // 如果麦克风已开，建立语音连接
+    if (micEnabled.value) setupVoiceWithRoom();
   });
 
   on('room_players', (msg) => {
@@ -673,6 +856,10 @@ const setupNetworkListeners = () => {
       gameState.players[i].avatar = p.avatar || gameState.players[i].avatar;
       gameState.players[i].score = p.score != null ? p.score : gameState.players[i].score;
     });
+    // 更新语音连接（新人加入时自动建连）
+    if (micEnabled.value && netState.roomId) {
+      setTimeout(() => setupVoiceWithRoom(), 500);
+    }
   });
 
   on('error', (msg) => {
@@ -800,6 +987,16 @@ const setupNetworkListeners = () => {
     netState.roomId = null;
     alert('与服务器断开连接');
   });
+
+  // === 聊天消息 ===
+  on('chat', (msg) => {
+    addChatMessage({ id: ++chatMsgId, from: msg.from, fromName: msg.fromName, text: msg.text });
+  });
+
+  // === WebRTC 语音信令 ===
+  on('webrtc_offer', (msg) => handleWebrtcSignal(msg));
+  on('webrtc_answer', (msg) => handleWebrtcSignal(msg));
+  on('webrtc_ice', (msg) => handleWebrtcSignal(msg));
 };
 
 // 联机模式下发送操作
@@ -1698,13 +1895,12 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
     align-items: center;
     width: 100vw;
     height: 100dvh;
+    height: 100vh;
     overflow: hidden;
   }
   /* 主菜单不旋转，保持竖屏自然显示 */
   .mahjong-desk:not(.in-menu) {
-    --sw: calc(100vw / 533);
-    --sh: calc(100dvh / 960);
-    transform: rotate(90deg) scale(min(var(--sw), var(--sh)));
+    transform: rotate(90deg) scale(var(--game-scale, 0.7));
     transform-origin: center center;
   }
 }
@@ -1743,7 +1939,22 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .dihu-btn.drag { background: linear-gradient(145deg, #ff9800, #f57c00); }
 .dihu-btn:active { transform: scale(0.95); }
 
-/* ===== BGM 音乐按钮 ===== */
-.music-toggle { position: fixed; top: 5px; right: 5px; z-index: 99999; background: #333; color: white; border: 2px solid #666; border-radius: 8px; padding: 4px 8px; font-size: 18px; cursor: pointer; opacity: 0.5; }
-.music-toggle:hover { opacity: 1; }
+/* ===== 顶部控制栏（BGM / 语音 / 聊天） ===== */
+.top-controls { position: fixed; top: 5px; right: 5px; z-index: 99999; display: flex; gap: 4px; }
+.ctrl-btn { background: #333; color: white; border: 2px solid #666; border-radius: 8px; padding: 4px 8px; font-size: 18px; cursor: pointer; opacity: 0.5; }
+.ctrl-btn:hover { opacity: 1; }
+
+/* ===== 聊天消息气泡 ===== */
+.chat-bubbles { position: fixed; top: 45px; right: 5px; z-index: 99998; display: flex; flex-direction: column; gap: 6px; max-width: 70vw; pointer-events: none; }
+.chat-bubble { background: rgba(0,0,0,0.75); color: white; border-radius: 10px; padding: 6px 12px; font-size: 14px; animation: chatFadeIn 0.3s ease-out; display: flex; flex-direction: column; }
+.chat-bubble.chat-self { background: rgba(0,100,200,0.75); align-items: flex-end; }
+.chat-name { font-size: 10px; color: #aaa; margin-bottom: 2px; }
+.chat-text { word-break: break-word; }
+@keyframes chatFadeIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+/* ===== 聊天输入栏 ===== */
+.chat-input-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 99999; background: rgba(0,0,0,0.9); padding: 10px 12px; display: flex; gap: 8px; align-items: center; }
+.chat-input { flex: 1; padding: 10px 14px; font-size: 16px; border: 2px solid #555; border-radius: 20px; background: rgba(255,255,255,0.1); color: white; outline: none; }
+.chat-input:focus { border-color: #ffd700; }
+.chat-send-btn { padding: 10px 18px; font-size: 14px; font-weight: bold; background: linear-gradient(145deg, #2196F3, #1565C0); border: none; border-radius: 20px; color: white; cursor: pointer; }
 </style>
