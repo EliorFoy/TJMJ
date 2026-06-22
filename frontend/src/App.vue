@@ -5,7 +5,7 @@
     <button class="music-toggle" @click="toggleMusic" :title="musicPlaying ? '暂停音乐' : '播放音乐'">{{ musicPlaying ? '🔊' : '🔇' }}</button>
 
     <div id="game-wrapper">
-      <div class="mahjong-desk">
+      <div class="mahjong-desk" :class="{ 'in-menu': isInMenu }">
         
         <!-- 自动连接中 -->
         <div class="ready-overlay" v-if="autoConnecting">
@@ -373,6 +373,8 @@ const startTurnTimer = () => {
   }, 20000);
 };
 const gameMode = ref('single'); // 'single' | 'multi' | 'spectate'
+// 是否在主菜单（控制移动端 CSS 旋转：菜单竖屏，其余横屏）
+const isInMenu = ref(true);
 const spectateView = ref(0); // 观战视角 (0=我, 1=下家, 2=对家, 3=上家)
 const multiState = reactive({
   roomId: '',
@@ -531,6 +533,7 @@ const exitFullscreen = () => {
 // 进入游戏模式：设置模式 + 横屏锁定 + 全屏
 const enterGame = (mode) => {
   gameMode.value = mode;
+  isInMenu.value = false; // 离开主菜单立即触发 CSS 横屏旋转
   lockLandscape();
   requestFullscreen();
   if (mode === 'single') {
@@ -543,9 +546,10 @@ const enterGame = (mode) => {
   // multi 模式：显示联机大厅，用户自行操作
 };
 
-// 返回主菜单：解锁方向 + 退出全屏
+// 返回主菜单：解锁方向 + 退出全屏 + 恢复竖屏
 const backToMenu = () => {
   gameMode.value = 'single';
+  isInMenu.value = true;
   unlockOrientation();
   exitFullscreen();
 };
@@ -563,6 +567,8 @@ onMounted(async () => {
   const autoJoin = params.get('auto_join');
   if (autoJoin) {
     gameMode.value = 'multi';
+    isInMenu.value = false;
+    lockLandscape();
     autoConnecting.value = true;
     multiState.playerName = params.get('name') || '测试玩家';
     multiState.joinInput = autoJoin;
@@ -1681,7 +1687,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
     height: 100vh;
   }
   /* 主菜单不旋转，保持竖屏自然显示 */
-  .mahjong-desk:not(:has(.mode-select-overlay)) {
+  .mahjong-desk:not(.in-menu) {
     --sw: calc((100vh - 12px) / 960);
     --sh: calc((100vw - 12px) / 533);
     transform: rotate(90deg) scale(min(var(--sw), var(--sh)));
