@@ -598,17 +598,32 @@ const updateGameScale = () => {
   const isPortrait = vw < vh && vw <= 1024;
 
   if (isPortrait && !isInMenu.value) {
-    // 手机竖屏游戏：旋转90°，视觉宽=533, 视觉高=960
+    // 手机竖屏游戏：fixed 居中 + rotate + scale
     const s = Math.min(vw / 533, vh / 960);
+    desk.style.position = 'fixed';
+    desk.style.top = '50%';
+    desk.style.left = '50%';
+    desk.style.marginLeft = '-480px';
+    desk.style.marginTop = '-266.5px';
     desk.style.transform = `rotate(90deg) scale(${s})`;
     desk.style.transformOrigin = 'center center';
   } else if (isPortrait) {
-    // 手机竖屏主菜单：不旋转不缩放
+    // 手机竖屏主菜单：恢复正常流
+    desk.style.position = '';
+    desk.style.top = '';
+    desk.style.left = '';
+    desk.style.marginLeft = '';
+    desk.style.marginTop = '';
     desk.style.transform = '';
     desk.style.transformOrigin = '';
   } else {
-    // 桌面：125% 缩放（fill + 25%）
-    const s = Math.min(vw / 960, vh / 533) * 1.25;
+    // 桌面：等比缩放铺满（不溢出）
+    desk.style.position = '';
+    desk.style.top = '';
+    desk.style.left = '';
+    desk.style.marginLeft = '';
+    desk.style.marginTop = '';
+    const s = Math.min(vw / 960, vh / 533);
     desk.style.transform = `scale(${s})`;
     desk.style.transformOrigin = 'center center';
   }
