@@ -1322,9 +1322,13 @@ const onTouchMove = (e) => {
   }
 };
 const onTouchEnd = (index) => {
-  // 如果没有拖动（轻点），触发点击出牌
+  // 轻点直接打出（手机不需要双击）
   if (!touchMoved && Date.now() - touchStartTime < 300) {
-    onTapTile(index);
+    gameState.selectedTileIndex = index;
+    const canDiscard = gameState.handTiles.length % 3 === 2 || gameState.handTiles.length % 3 === 0;
+    if (isMyTurn() && canDiscard && !actionState.isWaiting) {
+      playTile(index);
+    }
   }
   dragIndex.value = -1;
   dragOverIndex.value = -1;
@@ -1789,9 +1793,8 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 
 /* 模式选择 + 联机大厅 */
 .mode-select-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; z-index: 999; }
-.mode-dialog { text-align: center; color: white; position: relative; overflow: hidden; }
-.mode-dialog h2 { font-size: 36px; margin-bottom: 30px; color: #ffd700; }
-.mode-dialog { transform: scale(1.1); }
+.mode-dialog { text-align: center; color: white; position: relative; overflow: hidden; transform: scale(1.1) translateY(-5px); }
+.mode-dialog h2 { font-size: 36px; margin-bottom: 30px; color: #4CAF50; font-family: 'Microsoft YaHei', '微软雅黑', sans-serif; font-weight: bold; }
 .mode-btn { display: block; width: 260px; margin: 12px auto; padding: 14px; font-size: 18px; font-weight: bold; border: 2px solid #555; border-radius: 16px; cursor: pointer; background: rgba(255,255,255,0.1); color: white; transition: 0.2s; }
 .mode-btn:hover { background: rgba(255,255,255,0.2); border-color: #ffd700; }
 .mode-btn:active { background: rgba(255,255,255,0.3); transform: scale(0.95); }
@@ -2079,14 +2082,18 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 
 /* ===== 弹幕聊天层 ===== */
 .danmaku-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999; overflow: hidden; }
-.danmaku-item { position: absolute; white-space: nowrap; font-size: 16px; font-weight: bold; color: #fff; text-shadow: 0 0 4px #000, 0 0 8px #000; animation: danmakuScroll linear forwards; left: 100%; }
+.danmaku-item { position: absolute; white-space: nowrap; font-size: 16px; font-weight: bold; color: #fff; text-shadow: 0 0 4px #000, 0 0 8px #000; animation: danmakuScroll linear forwards; right: 100%; }
 .danmaku-name { color: #ffd700; margin-right: 4px; }
 .danmaku-text { color: #fff; }
-@keyframes danmakuScroll { from { transform: translateX(0); } to { transform: translateX(calc(-100vw - 100%)); } }
+@keyframes danmakuScroll { from { transform: translateX(0); } to { transform: translateX(calc(100vw + 100%)); } }
 
-/* ===== 聊天输入栏（屏幕底部固定） ===== */
+/* ===== 聊天输入栏 ===== */
 .chat-input-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 99999; background: rgba(0,0,0,0.9); padding: 10px 12px; display: flex; gap: 8px; align-items: center; }
 .chat-input { flex: 1; padding: 10px 14px; font-size: 16px; border: 2px solid #555; border-radius: 20px; background: rgba(255,255,255,0.1); color: white; outline: none; }
 .chat-input:focus { border-color: #ffd700; }
 .chat-send-btn { padding: 10px 18px; font-size: 14px; font-weight: bold; background: linear-gradient(145deg, #2196F3, #1565C0); border: none; border-radius: 20px; color: white; cursor: pointer; }
+/* 手机端：聊天框旋转90度匹配横屏游戏 */
+@media screen and (max-width: 1024px) and (orientation: portrait) {
+  .chat-input-bar { bottom: auto; top: 50%; right: 0; left: auto; transform: translateY(-50%) rotate(90deg); transform-origin: center center; border-radius: 12px 12px 0 0; }
+}
 </style>
