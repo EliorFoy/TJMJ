@@ -1,29 +1,24 @@
 <template>
   <div class="app-container">
-    <!-- BGM / 语音 / 聊天 控制 -->
-    <div class="top-controls">
-      <button class="ctrl-btn" @click="toggleMusic" :title="musicPlaying ? '暂停音乐' : '播放音乐'">{{ musicPlaying ? '🔊' : '🔇' }}</button>
-      <button class="ctrl-btn" @click="toggleMic" :title="micEnabled ? '关闭麦克风' : '打开麦克风'">{{ micEnabled ? '🎙️' : '🔕' }}</button>
-      <button class="ctrl-btn" @click="toggleChat" title="聊天">{{ showChatInput ? '💬' : '💭' }}</button>
-    </div>
     <audio ref="bgMusic" loop src="/TJMJ/bgm.mp3" preload="auto"></audio>
-
-    <!-- 聊天消息气泡 -->
-    <div class="chat-bubbles" v-if="chatMessages.length > 0">
-      <div v-for="m in chatMessages" :key="m.id" class="chat-bubble" :class="{ 'chat-self': m.from === myPlayerIndexForChat }">
-        <span class="chat-name">{{ m.fromName }}</span>
-        <span class="chat-text">{{ m.text }}</span>
-      </div>
-    </div>
-
-    <!-- 聊天输入框 -->
-    <div class="chat-input-bar" v-if="showChatInput && !isInMenu">
-      <input ref="chatInputRef" v-model="chatText" @keyup.enter="sendChat" placeholder="输入消息..." class="chat-input" maxlength="50" />
-      <button class="chat-send-btn" @click="sendChat">发送</button>
-    </div>
 
     <div id="game-wrapper">
       <div class="mahjong-desk" :class="{ 'in-menu': isInMenu }" :style="{ '--game-scale': gameScale }">
+
+        <!-- BGM / 语音 / 聊天 控制（游戏区域内部） -->
+        <div class="top-controls">
+          <button class="ctrl-btn" @click="toggleMusic" :title="musicPlaying ? '暂停音乐' : '播放音乐'">{{ musicPlaying ? '🔊' : '🔇' }}</button>
+          <button class="ctrl-btn" @click="toggleMic" :title="micEnabled ? '关闭麦克风' : '打开麦克风'">{{ micEnabled ? '🎙️' : '🔕' }}</button>
+          <button class="ctrl-btn" @click="toggleChat" title="聊天">{{ showChatInput ? '💬' : '💭' }}</button>
+        </div>
+
+        <!-- 聊天消息气泡 -->
+        <div class="chat-bubbles" v-if="chatMessages.length > 0">
+          <div v-for="m in chatMessages" :key="m.id" class="chat-bubble" :class="{ 'chat-self': m.from === myPlayerIndexForChat }">
+            <span class="chat-name">{{ m.fromName }}</span>
+            <span class="chat-text">{{ m.text }}</span>
+          </div>
+        </div>
         
         <!-- 自动连接中 -->
         <div class="ready-overlay" v-if="autoConnecting">
@@ -584,19 +579,26 @@ const backToMenu = () => {
   isInMenu.value = true;
   unlockOrientation();
   exitFullscreen();
+  updateGameScale(); // 恢复桌面缩放
   // 清理语音连接
   closeAllPeerConnections();
 };
 
-// ============ 手机端动态缩放 ============
+// ============ 动态缩放（桌面 + 手机通用）============
 const gameScale = ref(1);
 const updateGameScale = () => {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  // 旋转90°后：视觉宽=533, 视觉高=960
-  const sw = (vw - 8) / 533;
-  const sh = (vh - 8) / 960;
-  gameScale.value = Math.min(sw, sh, 1);
+  const isPortrait = vw < vh && vw <= 1024;
+  let s;
+  if (isPortrait && !isInMenu.value) {
+    // 手机竖屏旋转90°后：视觉宽=533, 视觉高=960
+    s = Math.min(vw / 533, vh / 960, 1);
+  } else {
+    // 桌面 / 手机横屏 / 主菜单：不旋转，视觉宽=960, 视觉高=533
+    s = Math.min(vw / 960, vh / 533, 1);
+  }
+  gameScale.value = s;
 };
 window.addEventListener('resize', updateGameScale);
 window.addEventListener('orientationchange', () => setTimeout(updateGameScale, 300));
@@ -754,6 +756,7 @@ const openTestMode = () => {
 // 自动加入逻辑（URL参数）
 const autoConnecting = ref(false);
 onMounted(async () => {
+  updateGameScale();
   const params = new URLSearchParams(location.search);
   const autoJoin = params.get('auto_join');
   if (autoJoin) {
@@ -1642,7 +1645,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 }
 
 /* 麻将桌：固定尺寸，通过 transform scale 适配屏幕 */
-.mahjong-desk { position: relative; width: 960px; height: 533px; background-color: #215c32; overflow: hidden; box-shadow: 0 0 30px #000; color: white; border: 4px solid #1a472a; border-radius: 10px; }
+.mahjong-desk { position: relative; width: 960px; height: 533px; background-color: #215c32; overflow: hidden; box-shadow: 0 0 30px #000; color: white; border: 4px solid #1a472a; border-radius: 10px; transform: scale(var(--game-scale, 1)); transform-origin: center center; }
 
 /* 准备遮罩层 */
 .ready-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 999; }
@@ -1870,35 +1873,17 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 /* =========================================================
    响应式适配：桌面端直接显示，移动端自动缩放
    ========================================================= */
-/* 手机/平板横屏：等比缩放适配 */
-@media screen and (max-width: 1024px) and (orientation: landscape) {
+/* 手机/平板：全屏显示 */
+@media screen and (max-width: 1024px) {
   #game-wrapper {
-    display: flex;
-    justify-content: center;
-    align-items: center;
     width: 100vw;
-    height: 100dvh;
-  }
-  .mahjong-desk {
-    --sw: calc(100vw / 960);
-    --sh: calc(100dvh / 533);
-    transform: scale(min(var(--sw), var(--sh)));
-    transform-origin: center center;
+    height: 100vh;
+    overflow: hidden;
   }
 }
 
 /* 手机竖屏：旋转90度强制横屏（仅游戏进行中，主菜单不旋转）*/
 @media screen and (max-width: 1024px) and (orientation: portrait) {
-  #game-wrapper {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 100vw;
-    height: 100dvh;
-    height: 100vh;
-    overflow: hidden;
-  }
-  /* 主菜单不旋转，保持竖屏自然显示 */
   .mahjong-desk:not(.in-menu) {
     transform: rotate(90deg) scale(var(--game-scale, 0.7));
     transform-origin: center center;
@@ -1939,20 +1924,20 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .dihu-btn.drag { background: linear-gradient(145deg, #ff9800, #f57c00); }
 .dihu-btn:active { transform: scale(0.95); }
 
-/* ===== 顶部控制栏（BGM / 语音 / 聊天） ===== */
-.top-controls { position: fixed; top: 5px; right: 5px; z-index: 99999; display: flex; gap: 4px; }
-.ctrl-btn { background: #333; color: white; border: 2px solid #666; border-radius: 8px; padding: 4px 8px; font-size: 18px; cursor: pointer; opacity: 0.5; }
-.ctrl-btn:hover { opacity: 1; }
+/* ===== 顶部控制栏（BGM / 语音 / 聊天，在游戏区域内） ===== */
+.top-controls { position: absolute; top: 6px; right: 80px; z-index: 99999; display: flex; gap: 3px; }
+.ctrl-btn { background: rgba(0,0,0,0.4); color: white; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 2px 6px; font-size: 15px; cursor: pointer; }
+.ctrl-btn:hover { background: rgba(0,0,0,0.7); }
 
-/* ===== 聊天消息气泡 ===== */
-.chat-bubbles { position: fixed; top: 45px; right: 5px; z-index: 99998; display: flex; flex-direction: column; gap: 6px; max-width: 70vw; pointer-events: none; }
-.chat-bubble { background: rgba(0,0,0,0.75); color: white; border-radius: 10px; padding: 6px 12px; font-size: 14px; animation: chatFadeIn 0.3s ease-out; display: flex; flex-direction: column; }
+/* ===== 聊天消息气泡（在游戏区域内） ===== */
+.chat-bubbles { position: absolute; top: 36px; right: 8px; z-index: 99998; display: flex; flex-direction: column; gap: 4px; max-width: 60%; pointer-events: none; }
+.chat-bubble { background: rgba(0,0,0,0.75); color: white; border-radius: 8px; padding: 4px 10px; font-size: 12px; animation: chatFadeIn 0.3s ease-out; display: flex; flex-direction: column; }
 .chat-bubble.chat-self { background: rgba(0,100,200,0.75); align-items: flex-end; }
-.chat-name { font-size: 10px; color: #aaa; margin-bottom: 2px; }
+.chat-name { font-size: 9px; color: #aaa; margin-bottom: 1px; }
 .chat-text { word-break: break-word; }
 @keyframes chatFadeIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
 
-/* ===== 聊天输入栏 ===== */
+/* ===== 聊天输入栏（屏幕底部固定） ===== */
 .chat-input-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 99999; background: rgba(0,0,0,0.9); padding: 10px 12px; display: flex; gap: 8px; align-items: center; }
 .chat-input { flex: 1; padding: 10px 14px; font-size: 16px; border: 2px solid #555; border-radius: 20px; background: rgba(255,255,255,0.1); color: white; outline: none; }
 .chat-input:focus { border-color: #ffd700; }
