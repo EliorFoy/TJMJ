@@ -70,7 +70,7 @@ export const disconnect = () => {
 
 // 发送消息（内置节流，防止过快点击导致断连）
 const _lastSend = {};
-const _THROTTLE = 200; // 同类型消息最小间隔200ms
+const _THROTTLE = 400; // 同类型消息最小间隔400ms
 export const send = (msg) => {
   const now = Date.now();
   const last = _lastSend[msg.type] || 0;

@@ -53,7 +53,6 @@
             <button class="mode-btn" @click="enterGame('single')">单人模式</button>
             <button class="mode-btn" @click="enterGame('multi')">联机模式</button>
             <button class="mode-btn" @click="enterGame('spectate')">观战模式</button>
-            <button class="mode-btn" disabled title="即将推出">AI比赛模式</button>
             <button class="mode-btn test-mode-btn" @click="enterGame('test')" :disabled="isMobileDevice" :title="isMobileDevice ? '测试模式仅支持电脑端' : ''">测试模式</button>
           </div>
         </div>
