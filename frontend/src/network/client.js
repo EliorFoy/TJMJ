@@ -3,9 +3,10 @@ import { reactive } from 'vue';
 
 // 服务器地址
 const WS_URL = (() => {
-  const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-  // 本地开发用 localhost:8080，公网用 ngrok 地址
-  const host = location.hostname === 'localhost' ? 'localhost:8080' : 'synapse-squander-finale.ngrok-free.dev';
+  // 本地开发用 localhost:8080，公网用 ngrok 地址（ngrok 仅接受 wss 加密连接）
+  const isLocal = location.hostname === 'localhost';
+  const protocol = isLocal ? 'ws:' : 'wss:';
+  const host = isLocal ? 'localhost:8080' : 'synapse-squander-finale.ngrok-free.dev';
   return `${protocol}//${host}`;
 })();
 
