@@ -17,11 +17,11 @@
           <button class="ctrl-btn" @click="toggleChat" title="聊天">{{ showChatInput ? '💬' : '💭' }}</button>
         </div>
 
-        <!-- 聊天消息气泡 -->
-        <div class="chat-bubbles" v-if="chatMessages.length > 0">
-          <div v-for="m in chatMessages" :key="m.id" class="chat-bubble" :class="{ 'chat-self': m.from === myPlayerIndexForChat }">
-            <span class="chat-name">{{ m.fromName }}</span>
-            <span class="chat-text">{{ m.text }}</span>
+        <!-- 弹幕聊天 -->
+        <div class="danmaku-layer" v-if="chatMessages.length > 0">
+          <div v-for="m in chatMessages" :key="m.id" class="danmaku-item" :style="{ top: m.top + '%', animationDuration: m.duration + 's' }">
+            <span class="danmaku-name">{{ m.fromName }}:</span>
+            <span class="danmaku-text">{{ m.text }}</span>
           </div>
         </div>
         
@@ -391,7 +391,7 @@ const toggleMusic = () => {
 let turnTimer = null;
 const startTurnTimer = () => {
   clearTimeout(turnTimer);
-  if (gameMode.value === 'spectate') return;
+  if (gameMode.value === 'spectate' || gameMode.value === 'single') return;
   turnTimer = setTimeout(() => {
     // 允许出牌：3n+2(刚摸牌) 或 3n(刚吃碰完)
     const canDiscard = gameState.handTiles.length % 3 === 2 || gameState.handTiles.length % 3 === 0;
@@ -663,10 +663,14 @@ const sendChat = () => {
 };
 
 const addChatMessage = (msg) => {
-  chatMessages.value.push(msg);
+  // 弹幕：随机纵向位置 + 滚动速度
+  const top = 10 + Math.random() * 70; // 10%-80% 纵向位置
+  const duration = 4 + Math.random() * 3; // 4-7秒划过
+  chatMessages.value.push({ ...msg, top, duration });
+  // 动画结束后移除
   setTimeout(() => {
     chatMessages.value = chatMessages.value.filter(m => m.id !== msg.id);
-  }, 5000);
+  }, duration * 1000 + 500);
 };
 
 // ============ WebRTC 语音 ============
@@ -2046,13 +2050,12 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .mic-bar:nth-child(4).active { height: 7px; }
 .mic-bar:nth-child(5).active { height: 8px; }
 
-/* ===== 聊天消息气泡（在游戏区域内） ===== */
-.chat-bubbles { position: absolute; top: 36px; right: 8px; z-index: 99998; display: flex; flex-direction: column; gap: 4px; max-width: 60%; pointer-events: none; }
-.chat-bubble { background: rgba(0,0,0,0.75); color: white; border-radius: 8px; padding: 4px 10px; font-size: 12px; animation: chatFadeIn 0.3s ease-out; display: flex; flex-direction: column; }
-.chat-bubble.chat-self { background: rgba(0,100,200,0.75); align-items: flex-end; }
-.chat-name { font-size: 9px; color: #aaa; margin-bottom: 1px; }
-.chat-text { word-break: break-word; }
-@keyframes chatFadeIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+/* ===== 弹幕聊天层 ===== */
+.danmaku-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999; overflow: hidden; }
+.danmaku-item { position: absolute; white-space: nowrap; font-size: 16px; font-weight: bold; color: #fff; text-shadow: 0 0 4px #000, 0 0 8px #000; animation: danmakuScroll linear forwards; left: 100%; }
+.danmaku-name { color: #ffd700; margin-right: 4px; }
+.danmaku-text { color: #fff; }
+@keyframes danmakuScroll { from { transform: translateX(0); } to { transform: translateX(calc(-100vw - 100%)); } }
 
 /* ===== 聊天输入栏（屏幕底部固定） ===== */
 .chat-input-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 99999; background: rgba(0,0,0,0.9); padding: 10px 12px; display: flex; gap: 8px; align-items: center; }
