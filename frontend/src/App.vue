@@ -1322,13 +1322,9 @@ const onTouchMove = (e) => {
   }
 };
 const onTouchEnd = (index) => {
-  // 轻点直接打出（手机不需要双击）
+  // 轻点=选中（弹起），再点=打出（和电脑端双击逻辑一致）
   if (!touchMoved && Date.now() - touchStartTime < 300) {
-    gameState.selectedTileIndex = index;
-    const canDiscard = gameState.handTiles.length % 3 === 2 || gameState.handTiles.length % 3 === 0;
-    if (isMyTurn() && canDiscard && !actionState.isWaiting) {
-      playTile(index);
-    }
+    onTapTile(index);
   }
   dragIndex.value = -1;
   dragOverIndex.value = -1;
@@ -1793,7 +1789,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 
 /* 模式选择 + 联机大厅 */
 .mode-select-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; z-index: 999; }
-.mode-dialog { text-align: center; color: white; position: relative; overflow: hidden; transform: scale(1.1) translateY(-5px); }
+.mode-dialog { text-align: center; color: white; position: relative; overflow: hidden; transform: scale(1.1); margin-top: -5%; }
 .mode-dialog h2 { font-size: 36px; margin-bottom: 30px; color: #4CAF50; font-family: 'Microsoft YaHei', '微软雅黑', sans-serif; font-weight: bold; }
 .mode-btn { display: block; width: 260px; margin: 12px auto; padding: 14px; font-size: 18px; font-weight: bold; border: 2px solid #555; border-radius: 16px; cursor: pointer; background: rgba(255,255,255,0.1); color: white; transition: 0.2s; }
 .mode-btn:hover { background: rgba(255,255,255,0.2); border-color: #ffd700; }
@@ -2094,6 +2090,6 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .chat-send-btn { padding: 10px 18px; font-size: 14px; font-weight: bold; background: linear-gradient(145deg, #2196F3, #1565C0); border: none; border-radius: 20px; color: white; cursor: pointer; }
 /* 手机端：聊天框旋转90度匹配横屏游戏 */
 @media screen and (max-width: 1024px) and (orientation: portrait) {
-  .chat-input-bar { bottom: auto; top: 50%; right: 0; left: auto; transform: translateY(-50%) rotate(90deg); transform-origin: center center; border-radius: 12px 12px 0 0; }
+  .chat-input-bar { bottom: auto; top: 50%; right: -40px; left: auto; transform: translateY(-50%) rotate(90deg); transform-origin: center center; border-radius: 12px; width: 60vh; max-width: 400px; }
 }
 </style>
