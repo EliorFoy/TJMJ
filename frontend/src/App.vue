@@ -13,7 +13,7 @@
         </div>
 
         <!-- 模式选择 -->
-        <div class="mode-select-overlay" v-if="gameState.gamePhase === 'WAITING' && !netState.roomId && !autoConnecting">
+        <div class="mode-select-overlay" v-if="isInMenu">
           <div class="mode-dialog">
             <h2>桃江麻将</h2>
             <div class="mode-anime">
