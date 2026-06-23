@@ -231,7 +231,7 @@
           <div class="settlement-panel">
             <h3>💰 手动结算</h3>
             <p>{{ gameState.players[settlement.winnerIndex]?.name }} 胡牌！</p>
-            <div class="settlement-row" v-for="(p, idx) in gameState.players" :key="'pay'+idx">
+            <div class="settlement-row" v-for="(p, idx) in gameState.players" :key="'pay'+idx" :class="{ 'winner-row': idx === settlement.winnerIndex }">
               <span class="settlement-name">{{ p.name }}</span>
               <span v-if="idx === settlement.winnerIndex" class="settlement-winner">🎉 赢家</span>
               <template v-else>
@@ -385,6 +385,7 @@ const playSong = (filename) => {
   const audio = bgMusic.value;
   if (!audio) return;
   audio.src = `/TJMJ/${encodeURI(filename)}`;
+  audio.volume = 0.65; // 统一音量
   audio.load();
   audio.play().then(() => {
     musicPlaying.value = true;
@@ -403,13 +404,14 @@ const playRandomFrom = (playlist) => {
   }
 };
 
-// 歌播完自动处理：首页交替，游戏内手动切
+// 歌播完自动处理：首页交替，游戏内自动下一首
 const onBgmEnded = () => {
-  if (!musicPlaying.value) return; // 已手动暂停
+  if (!musicPlaying.value) return;
   if (currentPlaylist.value === 'home') {
-    nextHomeSong(); // 首页自动交替
+    nextHomeSong();
+  } else {
+    nextSong();
   }
-  // 游戏内不自动切，用户手动点▶
 };
 
 // 首页：两首歌来回切（播完A→B→A→B...）
@@ -1237,6 +1239,14 @@ const startRound = () => {
   gameState.npcTileCounts[dealer] = 14;
   if (dealer === 0) gameState.npcTileCounts[0] = 14;
   gameState.currentPlayerIndex = dealer; // 庄家先出牌
+  // NPC庄家自动出首张牌
+  if (dealer !== 0) {
+    setTimeout(() => {
+      if (gameState.gamePhase === 'PLAYING' && gameState.currentPlayerIndex === dealer) {
+        npcPlayPhase(dealer);
+      }
+    }, 1200);
+  }
   // 观战模式：初始视角
   if (gameMode.value === 'spectate') {
     gameState.handTiles = [...(gameState.npcHands[spectateView.value] || [])];
@@ -2098,6 +2108,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .settlement-panel { background: #1a3a1a; border: 3px solid #ffd700; border-radius: 12px; padding: 20px; text-align: center; color: white; min-width: 280px; }
 .settlement-panel h3 { color: #ffd700; margin: 0 0 10px; }
 .settlement-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 6px 0; padding: 6px 10px; background: rgba(255,255,255,0.1); border-radius: 8px; }
+.settlement-row.winner-row { background: rgba(255,215,0,0.25); border: 2px solid #ffd700; box-shadow: 0 0 12px rgba(255,215,0,0.4); }
 .settlement-name { font-size: 14px; font-weight: bold; }
 .settlement-winner { color: #ffd700; font-size: 14px; }
 .settlement-pay-btn { padding: 6px 14px; font-size: 13px; background: linear-gradient(145deg, #ff9800, #f57c00); border: none; border-radius: 8px; color: white; cursor: pointer; font-weight: bold; }
