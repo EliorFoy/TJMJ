@@ -458,12 +458,12 @@ const nextSong = () => {
   playSong(gameQueue[next]);
 };
 
-// 切换O叔歌单
+// 切换O叔歌单（点击即播放）
 const toggleOskarpianist = () => {
   gameGenre.value = gameGenre.value === 'o' ? 'default' : 'o';
-  if (currentPlaylist.value === 'game' && musicPlaying.value) {
+  if (currentPlaylist.value === 'game') {
     gameQueue = shuffle(getGameSongs());
-    playSong(gameQueue[0]);
+    playSong(gameQueue[0]); // 直接播放，不管之前是否静音
   }
 };
 
@@ -673,6 +673,7 @@ const enterGame = (mode) => {
   isInMenu.value = false; // 离开主菜单立即触发 CSS 横屏旋转
   updateGameScale(); // 计算手机端缩放比
   stopMusic(); // 进入模式BGM默认关闭
+  currentPlaylist.value = 'game'; // 标记为游戏歌单
   lockLandscape();
   requestFullscreen();
   if (mode === 'single') {
@@ -693,6 +694,8 @@ const backToMenu = () => {
   exitFullscreen();
   updateGameScale(); // 恢复桌面缩放
   stopMusic();
+  currentPlaylist.value = 'home';
+  gameGenre.value = 'default';
   setTimeout(() => playRandomFrom('home'), 300); // 切回首页歌单
   // 清理语音连接
   closeAllPeerConnections();
