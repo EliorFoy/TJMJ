@@ -278,10 +278,10 @@
               </span>
               <span class="showdown-score" :class="p.score >= 0 ? 'score-up' : 'score-down'">{{ p.score >= 0 ? '+' : '' }}{{ p.score }}</span>
             </div>
-            <div class="showdown-round">第 {{ gameState.roundNumber }}/16 局 | 累计总分</div>
+            <div class="showdown-round">第 {{ gameState.roundNumber }}/16 局 | 总分（累计）</div>
             <div class="showdown-cumulative">
               <span v-for="(p, idx) in gameState.players" :key="'cum'+idx" style="margin:0 8px;">
-                {{ p.name }}: {{ p.score }}
+                {{ p.name }}: {{ p.score >= 0 ? '+' : '' }}{{ p.score }}
               </span>
             </div>
             <button class="btn-ready" @click="nextRoundOrFinish">{{ gameState.roundNumber >= 16 ? '🏆 查看最终排名' : '▶ 下一局' }}</button>
@@ -1111,9 +1111,6 @@ const multiPass = () => send({ type: 'pass' });
 const multiEmoji = (icon, target) => send({ type: 'emoji', icon, target });
 
 // 下一局或结束
-// 防御性分数保存（跨局不丢失）
-let _savedScores = null;
-
 const nextRoundOrFinish = () => {
   gameState.showdownHands = null;
   settlement.active = false;
@@ -1126,16 +1123,13 @@ const nextRoundOrFinish = () => {
     ).join('\n');
     alert(`🏆 16局结束！最终排名：\n${summary}`);
     gameState.roundNumber = 1;
-    gameState.totalScores = [0, 0, 0, 0];
     gameState.players.forEach(p => p.score = 0);
     gameState.readyStatus = [false, false, false, false];
     gameState.dealerIndex = 0;
     gameState.gamePhase = 'WAITING';
-    _savedScores = null;
     return;
   }
-  // 保存本轮结束后的分数
-  _savedScores = gameState.players.map(p => p.score);
+  // 分数自然累积不重置，结算界面的支付金额=当局限分
   gameState.roundNumber++;
   gameState.dealerIndex = settlement.winnerIndex >= 0 ? settlement.winnerIndex : (gameState.dealerIndex + 1) % 4;
   if (gameMode.value === 'single') {
@@ -1145,12 +1139,6 @@ const nextRoundOrFinish = () => {
 };
 
 const startRound = () => {
-  // 防御性恢复跨局分数
-  if (_savedScores) {
-    _savedScores.forEach((s, i) => { gameState.players[i].score = s; });
-    _savedScores = null;
-  }
-
   actionState.isWaiting = false;
   actionState.targetTile = null;
   actionState.canChi = actionState.canPeng = actionState.canGang = actionState.canHu = false;
@@ -1179,32 +1167,37 @@ const startRound = () => {
   gameState.wangTile = calculateWang(gameState.diTile);
 
   gameState.handTiles = []; gameState.npcHands = [[], [], [], []];
-  
+  const dealer = gameState.dealerIndex;
+
   for(let i=0; i<53; i++) {
     let tile = physicalDraw();
-    let player = Math.floor(i / 4) % 4; 
-    if (i >= 48) player = i - 48; 
-    if (i === 52) player = 0;     
+    let player = Math.floor(i / 4) % 4;
+    if (i >= 48) player = i - 48;
+    if (i === 52) player = dealer;  // 庄家起手14张
     if (player === 0) { gameState.handTiles.push(tile); gameState.npcHands[0].push(tile); }
     else gameState.npcHands[player].push(tile);
   }
-  
+
   gameState.handTiles.sort((a,b)=>a-b);
   gameState.npcHands.forEach(hand => hand.sort((a,b)=>a-b));
+  // 庄家14张，闲家13张
   gameState.npcTileCounts = [13, 13, 13, 13];
-  gameState.currentPlayerIndex = 0;
+  gameState.npcTileCounts[dealer] = 14;
+  if (dealer === 0) gameState.npcTileCounts[0] = 14;
+  gameState.currentPlayerIndex = dealer; // 庄家先出牌
   // 观战模式：初始视角
   if (gameMode.value === 'spectate') {
     gameState.handTiles = [...(gameState.npcHands[spectateView.value] || [])];
   }
 
   // 【起手胡/起手报听检测】
-  // 庄家(玩家)14张：检查起手胡
-  const dealerCheck = HuCalculator.checkFirstTurn(gameState.handTiles, gameState.wangTile, true);
+  // 庄家14张：检查起手胡
+  const dealerHand = dealer === 0 ? gameState.handTiles : gameState.npcHands[dealer];
+  const dealerCheck = HuCalculator.checkFirstTurn(dealerHand, gameState.wangTile, true);
   if (dealerCheck.canFirstTurnHu) {
-    gameState.players[0].score += dealerCheck.score;
+    gameState.players[dealer].score += dealerCheck.score;
     gameState.gamePhase = 'WAITING';
-    alert(`【起手胡！】庄家14张直接胡牌！(${dealerCheck.type}) 得 ${dealerCheck.score} 分！`);
+    alert(`【起手胡！】${gameState.players[dealer].name} 庄家14张直接胡牌！(${dealerCheck.type}) 得 ${dealerCheck.score} 分！`);
     return;
   }
   // 闲家(NPC)13张：检查起手报听
