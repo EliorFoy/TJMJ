@@ -1,6 +1,6 @@
 <template>
   <div class="app-container">
-    <audio ref="bgMusic" preload="auto"></audio>
+    <audio ref="bgMusic" preload="auto" @ended="onBgmEnded"></audio>
 
     <!-- 聊天输入框（屏幕底部，始终在最上层） -->
     <div class="chat-input-bar" v-if="showChatInput">
@@ -13,7 +13,7 @@
 
         <!-- 控制按钮：首页只显示BGM居中，游戏中显示全部 -->
         <div class="top-controls" :class="{ 'menu-only': isInMenu }">
-          <button class="ctrl-btn" @click="nextSong" title="切歌">▶</button>
+          <button class="ctrl-btn" @click="nextSong" title="切歌" v-if="!isInMenu">▶</button>
           <button class="ctrl-btn" @click="toggleMusic" :title="musicPlaying ? '暂停音乐' : '播放音乐'">{{ musicPlaying ? '🔊' : '🔇' }}</button>
           <template v-if="!isInMenu">
             <button class="ctrl-btn mic-btn" @click="toggleMic" :title="micEnabled ? '关闭麦克风' : '打开麦克风'">
@@ -376,8 +376,10 @@ const musicPlaying = ref(false);
 const HOME_SONGS = ['bgm羊了个羊.mp3', 'bgm捂嘴手势舞.mp3'];
 const GAME_SONGS = ['1.PVZ.mp3','2.搞怪.mp3','3.恭喜发财.mp3','4.滑稽.mp3','5.鸡.mp3','6.嫉妒与愤怒钢琴.mp3','7.浪漫华尔兹.mp3','8.燃起来.mp3','9.温柔吉他.mp3'];
 const currentPlaylist = ref('home'); // 'home' | 'game'
+let gameQueue = []; // 游戏歌单随机队列（不重复循环）
+let homeSongIdx = 0; // 首页歌单交替索引
 
-const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
+const shuffle = (arr) => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
 const playSong = (filename) => {
   const audio = bgMusic.value;
@@ -393,12 +395,36 @@ const playSong = (filename) => {
 
 const playRandomFrom = (playlist) => {
   currentPlaylist.value = playlist;
-  playSong(pickRandom(playlist === 'home' ? HOME_SONGS : GAME_SONGS));
+  if (playlist === 'home') {
+    playSong(HOME_SONGS[homeSongIdx]);
+  } else {
+    gameQueue = shuffle(GAME_SONGS);
+    playSong(gameQueue[0]);
+  }
 };
 
+// 歌播完自动处理：首页交替，游戏内手动切
+const onBgmEnded = () => {
+  if (!musicPlaying.value) return; // 已手动暂停
+  if (currentPlaylist.value === 'home') {
+    nextHomeSong(); // 首页自动交替
+  }
+  // 游戏内不自动切，用户手动点▶
+};
+
+// 首页：两首歌来回切（播完A→B→A→B...）
+const nextHomeSong = () => {
+  homeSongIdx = (homeSongIdx + 1) % HOME_SONGS.length;
+  playSong(HOME_SONGS[homeSongIdx]);
+};
+
+// 游戏内：9首不重复队列切歌
 const nextSong = () => {
-  const list = currentPlaylist.value === 'home' ? HOME_SONGS : GAME_SONGS;
-  playSong(pickRandom(list));
+  if (currentPlaylist.value === 'home') { nextHomeSong(); return; }
+  const idx = gameQueue.findIndex(f => bgMusic.value?.src?.endsWith?.(encodeURI(f)));
+  const next = (idx + 1) % gameQueue.length;
+  if (next === 0) gameQueue = shuffle(GAME_SONGS); // 一轮播完重新洗牌
+  playSong(gameQueue[next]);
 };
 
 // 首页自动播放
