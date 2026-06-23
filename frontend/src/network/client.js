@@ -68,17 +68,20 @@ export const disconnect = () => {
   netState.playerIndex = -1;
 };
 
-// 发送消息（内置节流，防止过快点击导致断连）
+// 发送消息（游戏操作节流防崩溃，WebRTC信令不节流）
 const _lastSend = {};
-const _THROTTLE = 400; // 同类型消息最小间隔400ms
+const _THROTTLE = 400;
+const _NO_THROTTLE = ['webrtc_offer', 'webrtc_answer', 'webrtc_ice', 'chat'];
 export const send = (msg) => {
   const now = Date.now();
-  const last = _lastSend[msg.type] || 0;
-  if (now - last < _THROTTLE) {
-    console.log('[client] 节流跳过:', msg.type, `(距上次${now - last}ms)`);
-    return;
+  if (!_NO_THROTTLE.includes(msg.type)) {
+    const last = _lastSend[msg.type] || 0;
+    if (now - last < _THROTTLE) {
+      console.log('[client] 节流跳过:', msg.type, `(距上次${now - last}ms)`);
+      return;
+    }
+    _lastSend[msg.type] = now;
   }
-  _lastSend[msg.type] = now;
   console.log('[client] send:', msg.type, 'ws状态:', ws?.readyState);
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(msg));

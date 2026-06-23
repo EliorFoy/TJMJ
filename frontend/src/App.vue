@@ -791,7 +791,10 @@ let analyserNode = null;
 let micLevelTimer = null;
 
 const rtcConfig = {
-  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+  ]
 };
 
 // 启动音量监测
@@ -847,9 +850,13 @@ const setupVoiceWithRoom = async () => {
   if (!localStream.value) return;
   const myIdx = netState.playerIndex;
   myPlayerIndexForChat.value = myIdx;
+  // 关闭旧连接重建（确保音频轨道正确添加）
+  peerConnections.forEach(pc => pc.close());
+  peerConnections.clear();
   netState.players.forEach((p, i) => {
-    if (i !== myIdx && p.connected && !peerConnections.has(i)) {
-      createPeerConnection(i, myIdx < i); // 仅序号小的一方发起offer
+    if (i !== myIdx) {
+      createPeerConnection(i, myIdx < i);
+      console.log('[语音] 创建P2P连接: 我=' + myIdx + ' → 对方=' + i);
     }
   });
 };
@@ -866,6 +873,9 @@ const createPeerConnection = (targetIdx, isOfferer = true) => {
     if (e.candidate) {
       send({ type: 'webrtc_ice', to: targetIdx, data: e.candidate });
     }
+  };
+  pc.oniceconnectionstatechange = () => {
+    console.log('[语音] ICE状态 对方=' + targetIdx + ': ' + pc.iceConnectionState);
   };
 
   pc.ontrack = (e) => {
@@ -904,6 +914,9 @@ const handleWebrtcSignal = (msg) => {
       });
       pc.onicecandidate = (e) => {
         if (e.candidate) send({ type: 'webrtc_ice', to: from, data: e.candidate });
+      };
+      pc.oniceconnectionstatechange = () => {
+        console.log('[语音] ICE状态 来自=' + from + ': ' + pc.iceConnectionState);
       };
       pc.ontrack = (e) => {
         try {
