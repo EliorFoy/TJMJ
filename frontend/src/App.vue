@@ -629,7 +629,8 @@ const backToMenu = () => {
   unlockOrientation();
   exitFullscreen();
   updateGameScale(); // 恢复桌面缩放
-  tryAutoPlay(); // 回到首页恢复BGM
+  stopMusic();
+  setTimeout(() => playRandomFrom('home'), 300); // 切回首页歌单
   // 清理语音连接
   closeAllPeerConnections();
 };
