@@ -14,6 +14,7 @@
         <!-- 控制按钮：首页只显示BGM居中，游戏中显示全部 -->
         <div class="top-controls" :class="{ 'menu-only': isInMenu }">
           <button class="ctrl-btn" @click="nextSong" title="切歌" v-if="!isInMenu">▶</button>
+          <button class="ctrl-btn" @click="toggleOskarpianist" title="O叔钢琴" v-if="!isInMenu" :style="gameGenre === 'o' ? { background: 'rgba(255,215,0,0.5)', borderColor: '#ffd700' } : {}">🎹</button>
           <button class="ctrl-btn" @click="toggleMusic" :title="musicPlaying ? '暂停音乐' : '播放音乐'">{{ musicPlaying ? '🔊' : '🔇' }}</button>
           <template v-if="!isInMenu">
             <button class="ctrl-btn mic-btn" @click="toggleMic" :title="micEnabled ? '关闭麦克风' : '打开麦克风'">
@@ -231,7 +232,7 @@
           <div class="settlement-panel">
             <h3>💰 手动结算</h3>
             <p>{{ gameState.players[settlement.winnerIndex]?.name }} 胡牌！</p>
-            <div class="settlement-row" v-for="(p, idx) in gameState.players" :key="'pay'+idx" :class="{ 'winner-row': idx === settlement.winnerIndex }">
+            <div class="settlement-row" v-for="(p, idx) in gameState.players" :key="'pay'+idx" :style="idx === settlement.winnerIndex ? { background: 'rgba(255,215,0,0.3)', border: '2px solid #ffd700', boxShadow: '0 0 16px rgba(255,215,0,0.5)' } : {}">
               <span class="settlement-name">{{ p.name }}</span>
               <span v-if="idx === settlement.winnerIndex" class="settlement-winner">🎉 赢家</span>
               <template v-else>
@@ -376,8 +377,12 @@ const musicPlaying = ref(false);
 const HOME_SONGS = ['bgm羊了个羊.mp3', 'bgm捂嘴手势舞.mp3'];
 const GAME_SONGS = ['1.PVZ.mp3','2.搞怪.mp3','3.恭喜发财.mp3','4.滑稽.mp3','5.鸡.mp3','6.嫉妒与愤怒钢琴.mp3','7.浪漫华尔兹.mp3','8.燃起来.mp3','9.温柔吉他.mp3'];
 const currentPlaylist = ref('home'); // 'home' | 'game'
+const gameGenre = ref('default'); // 'default' | 'o'
+const O_SONGS = ['oskarpianist/不为谁而作的歌.mp3','oskarpianist/我记得.mp3','oskarpianist/暮色回响.mp3','oskarpianist/曹操.mp3','oskarpianist/枫.mp3','oskarpianist/海阔天空.mp3','oskarpianist/起风了.mp3'];
 let gameQueue = []; // 游戏歌单随机队列（不重复循环）
 let homeSongIdx = 0; // 首页歌单交替索引
+
+const getGameSongs = () => gameGenre.value === 'o' ? O_SONGS : GAME_SONGS;
 
 const shuffle = (arr) => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
@@ -399,7 +404,7 @@ const playRandomFrom = (playlist) => {
   if (playlist === 'home') {
     playSong(HOME_SONGS[homeSongIdx]);
   } else {
-    gameQueue = shuffle(GAME_SONGS);
+    gameQueue = shuffle(getGameSongs());
     playSong(gameQueue[0]);
   }
 };
@@ -420,13 +425,23 @@ const nextHomeSong = () => {
   playSong(HOME_SONGS[homeSongIdx]);
 };
 
-// 游戏内：9首不重复队列切歌
+// 游戏内：不重复队列切歌
 const nextSong = () => {
   if (currentPlaylist.value === 'home') { nextHomeSong(); return; }
+  const songs = getGameSongs();
   const idx = gameQueue.findIndex(f => bgMusic.value?.src?.endsWith?.(encodeURI(f)));
   const next = (idx + 1) % gameQueue.length;
-  if (next === 0) gameQueue = shuffle(GAME_SONGS); // 一轮播完重新洗牌
+  if (next === 0) gameQueue = shuffle(songs);
   playSong(gameQueue[next]);
+};
+
+// 切换O叔歌单
+const toggleOskarpianist = () => {
+  gameGenre.value = gameGenre.value === 'o' ? 'default' : 'o';
+  if (currentPlaylist.value === 'game' && musicPlaying.value) {
+    gameQueue = shuffle(getGameSongs());
+    playSong(gameQueue[0]);
+  }
 };
 
 // 首页自动播放
@@ -1734,10 +1749,7 @@ const executePlayerHu = (handToCheck, isSelfDraw, discarderIndex = -1) => {
   const isFirst = gameState.deckRemaining >= 54;
   const result = HuCalculator.checkHu(handToCheck, gameState.wangTile, gameState.diTile, isFirst);
 
-  if (!result.canHu) {
-    alert("系统判定没胡！");
-    return;
-  }
+  if (!result.canHu) return; // 不能胡，静默
 
   // 地胡带拖：弹出选择
   if (result.canDrag && isSelfDraw) {
