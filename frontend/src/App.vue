@@ -232,7 +232,7 @@
           <div class="settlement-panel">
             <h3>💰 手动结算</h3>
             <p>{{ gameState.players[settlement.winnerIndex]?.name }} 胡牌！</p>
-            <div class="settlement-row" v-for="(p, idx) in gameState.players" :key="'pay'+idx" :style="idx === settlement.winnerIndex ? { background: 'rgba(255,215,0,0.3)', border: '2px solid #ffd700', boxShadow: '0 0 16px rgba(255,215,0,0.5)' } : {}">
+            <div class="settlement-row" v-for="(p, idx) in gameState.players" :key="'pay'+idx" :class="{ 'winner-row': idx === settlement.winnerIndex }">
               <span class="settlement-name">{{ p.name }}</span>
               <span v-if="idx === settlement.winnerIndex" class="settlement-winner">🎉 赢家</span>
               <template v-else>
@@ -386,12 +386,35 @@ const getGameSongs = () => gameGenre.value === 'o' ? O_SONGS : GAME_SONGS;
 
 const shuffle = (arr) => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
+// Web Audio 音量压缩器（统一所有歌曲音量）
+let _audioCtx = null;
+let _compressor = null;
+const _initCompressor = () => {
+  if (_audioCtx) return;
+  try {
+    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    _compressor = _audioCtx.createDynamicsCompressor();
+    _compressor.threshold.value = -24;
+    _compressor.knee.value = 30;
+    _compressor.ratio.value = 12;
+    _compressor.attack.value = 0.003;
+    _compressor.release.value = 0.25;
+    _compressor.connect(_audioCtx.destination);
+  } catch(e) {}
+};
+const _connectCompressor = (audio) => {
+  if (!_audioCtx || !_compressor) return;
+  try { _audioCtx.createMediaElementSource(audio).connect(_compressor); } catch(e) {}
+};
+
 const playSong = (filename) => {
   const audio = bgMusic.value;
   if (!audio) return;
+  _initCompressor();
   audio.src = `/TJMJ/${encodeURI(filename)}`;
-  audio.volume = 0.65; // 统一音量
+  audio.volume = 0.65;
   audio.load();
+  _connectCompressor(audio);
   audio.play().then(() => {
     musicPlaying.value = true;
   }).catch((e) => {
@@ -2120,7 +2143,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .settlement-panel { background: #1a3a1a; border: 3px solid #ffd700; border-radius: 12px; padding: 20px; text-align: center; color: white; min-width: 280px; }
 .settlement-panel h3 { color: #ffd700; margin: 0 0 10px; }
 .settlement-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 6px 0; padding: 6px 10px; background: rgba(255,255,255,0.1); border-radius: 8px; }
-.settlement-row.winner-row { background: rgba(255,215,0,0.25); border: 2px solid #ffd700; box-shadow: 0 0 12px rgba(255,215,0,0.4); }
+.settlement-row.winner-row { background: rgba(255,215,0,0.3) !important; border: 2px solid #ffd700 !important; box-shadow: 0 0 16px rgba(255,215,0,0.5) !important; }
 .settlement-name { font-size: 14px; font-weight: bold; }
 .settlement-winner { color: #ffd700; font-size: 14px; }
 .settlement-pay-btn { padding: 6px 14px; font-size: 13px; background: linear-gradient(145deg, #ff9800, #f57c00); border: none; border-radius: 8px; color: white; cursor: pointer; font-weight: bold; }
