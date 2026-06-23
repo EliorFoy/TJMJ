@@ -1,6 +1,6 @@
 <template>
   <div class="app-container">
-    <audio ref="bgMusic" loop src="/TJMJ/bgm.mp3" preload="auto"></audio>
+    <audio ref="bgMusic" preload="auto" @ended="nextSong"></audio>
 
     <!-- 聊天输入框（屏幕底部，始终在最上层） -->
     <div class="chat-input-bar" v-if="showChatInput">
@@ -13,6 +13,7 @@
 
         <!-- 控制按钮：首页只显示BGM居中，游戏中显示全部 -->
         <div class="top-controls" :class="{ 'menu-only': isInMenu }">
+          <button class="ctrl-btn" @click="nextSong" title="切歌" v-if="musicPlaying">⏭</button>
           <button class="ctrl-btn" @click="toggleMusic" :title="musicPlaying ? '暂停音乐' : '播放音乐'">{{ musicPlaying ? '🔊' : '🔇' }}</button>
           <template v-if="!isInMenu">
             <button class="ctrl-btn mic-btn" @click="toggleMic" :title="micEnabled ? '关闭麦克风' : '打开麦克风'">
@@ -371,15 +372,38 @@ const gameState = reactive({
 const bgMusic = ref(null);
 const musicPlaying = ref(false);
 
-// BGM：首页自动播放，进游戏自动关闭
+// ===== BGM 歌单系统 =====
+const HOME_SONGS = ['bgm羊了个羊.mp3', 'bgm捂嘴手势舞.mp3'];
+const GAME_SONGS = ['1.PVZ.mp3','2.搞怪.mp3','3.恭喜发财.mp3','4.滑稽.mp3','5.鸡.mp3','6.嫉妒与愤怒钢琴.mp3','7.浪漫华尔兹.mp3','8.燃起来.mp3','9.温柔吉他.mp3'];
+const currentPlaylist = ref('home'); // 'home' | 'game'
+
+const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+const playSong = (filename) => {
+  const audio = bgMusic.value;
+  if (!audio) return;
+  audio.src = `/TJMJ/${filename}`;
+  audio.load();
+  audio.play().then(() => {
+    musicPlaying.value = true;
+  }).catch(() => {});
+};
+
+const playRandomFrom = (playlist) => {
+  currentPlaylist.value = playlist;
+  playSong(pickRandom(playlist === 'home' ? HOME_SONGS : GAME_SONGS));
+};
+
+const nextSong = () => {
+  const list = currentPlaylist.value === 'home' ? HOME_SONGS : GAME_SONGS;
+  playSong(pickRandom(list));
+};
+
+// 首页自动播放
 const tryAutoPlay = () => {
   const audio = bgMusic.value;
   if (!audio || musicPlaying.value) return;
-  audio.play().then(() => {
-    musicPlaying.value = true;
-  }).catch(() => {
-    // 浏览器阻止自动播放，等用户交互后再试
-  });
+  playRandomFrom('home');
 };
 
 const stopMusic = () => {
@@ -396,9 +420,11 @@ const toggleMusic = () => {
     audio.pause();
     musicPlaying.value = false;
   } else {
-    audio.play().then(() => {
-      musicPlaying.value = true;
-    }).catch(() => {});
+    if (!audio.src || audio.src === window.location.href) {
+      playRandomFrom(currentPlaylist.value);
+    } else {
+      audio.play().then(() => { musicPlaying.value = true; }).catch(() => {});
+    }
   }
 };
 
@@ -582,7 +608,8 @@ const enterGame = (mode) => {
   gameMode.value = mode;
   isInMenu.value = false; // 离开主菜单立即触发 CSS 横屏旋转
   updateGameScale(); // 计算手机端缩放比
-  stopMusic(); // 进入对局关闭BGM
+  stopMusic(); // 停首页BGM
+  setTimeout(() => playRandomFrom('game'), 500); // 切换游戏歌单
   lockLandscape();
   requestFullscreen();
   if (mode === 'single') {
