@@ -1,6 +1,6 @@
 <template>
   <div class="app-container">
-    <audio ref="bgMusic" preload="auto" @ended="nextSong"></audio>
+    <audio ref="bgMusic" preload="auto"></audio>
 
     <!-- 聊天输入框（屏幕底部，始终在最上层） -->
     <div class="chat-input-bar" v-if="showChatInput">
@@ -382,11 +382,13 @@ const pickRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const playSong = (filename) => {
   const audio = bgMusic.value;
   if (!audio) return;
-  audio.src = `/TJMJ/${filename}`;
+  audio.src = `/TJMJ/${encodeURI(filename)}`;
   audio.load();
   audio.play().then(() => {
     musicPlaying.value = true;
-  }).catch(() => {});
+  }).catch((e) => {
+    console.log('BGM播放失败:', e);
+  });
 };
 
 const playRandomFrom = (playlist) => {
