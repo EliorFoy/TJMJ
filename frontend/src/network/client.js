@@ -20,6 +20,7 @@ export const netState = reactive({
 
 let ws = null;
 let listeners = new Map(); // event → Set of callbacks
+let sendQueue = []; // 连接建立前的消息缓冲
 
 // 连接服务器
 export const connect = () => {
@@ -39,6 +40,12 @@ export const connect = () => {
     ws.onopen = () => {
       netState.connected = true;
       netState.error = null;
+      // 冲刷缓冲的消息
+      if (sendQueue.length > 0) {
+        console.log('[client] 冲刷缓冲消息:', sendQueue.length, '条');
+        sendQueue.forEach(m => ws.send(JSON.stringify(m)));
+        sendQueue = [];
+      }
       resolve();
     };
 
@@ -85,6 +92,9 @@ export const send = (msg) => {
   console.log('[client] send:', msg.type, 'ws状态:', ws?.readyState);
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(msg));
+  } else if (ws && ws.readyState === WebSocket.CONNECTING) {
+    // 连接中，缓冲消息
+    sendQueue.push(msg);
   } else {
     console.error('[client] 无法发送! ws=', ws, 'readyState=', ws?.readyState);
   }

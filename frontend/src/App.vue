@@ -672,8 +672,7 @@ const enterGame = (mode) => {
   gameMode.value = mode;
   isInMenu.value = false; // 离开主菜单立即触发 CSS 横屏旋转
   updateGameScale(); // 计算手机端缩放比
-  stopMusic(); // 停首页BGM
-  setTimeout(() => playRandomFrom('game'), 500); // 切换游戏歌单
+  stopMusic(); // 进入模式BGM默认关闭
   lockLandscape();
   requestFullscreen();
   if (mode === 'single') {
