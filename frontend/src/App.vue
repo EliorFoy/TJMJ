@@ -13,7 +13,7 @@
 
         <!-- 控制按钮：首页只显示BGM居中，游戏中显示全部 -->
         <div class="top-controls" :class="{ 'menu-only': isInMenu }">
-          <button class="ctrl-btn" @click="nextSong" title="切歌" v-if="musicPlaying">⏭</button>
+          <button class="ctrl-btn" @click="nextSong" title="切歌">▶</button>
           <button class="ctrl-btn" @click="toggleMusic" :title="musicPlaying ? '暂停音乐' : '播放音乐'">{{ musicPlaying ? '🔊' : '🔇' }}</button>
           <template v-if="!isInMenu">
             <button class="ctrl-btn mic-btn" @click="toggleMic" :title="micEnabled ? '关闭麦克风' : '打开麦克风'">
@@ -420,11 +420,7 @@ const toggleMusic = () => {
     audio.pause();
     musicPlaying.value = false;
   } else {
-    if (!audio.src || audio.src === window.location.href) {
-      playRandomFrom(currentPlaylist.value);
-    } else {
-      audio.play().then(() => { musicPlaying.value = true; }).catch(() => {});
-    }
+    playRandomFrom(currentPlaylist.value);
   }
 };
 
