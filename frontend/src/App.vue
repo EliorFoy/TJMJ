@@ -71,39 +71,6 @@
           </div>
         </div>
 
-        <!-- 内容弹窗（教程/视频/协议） -->
-        <div class="info-overlay" v-if="infoOverlay" @click.self="closeInfo">
-          <div class="info-panel">
-            <button class="info-close" @click="closeInfo">✕</button>
-            <!-- 教程文档：新标签页高清打开 -->
-            <div v-if="infoOverlay === 'manual'" class="info-text" style="text-align:center;display:flex;align-items:center;justify-content:center;flex-direction:column;">
-              <p style="font-size:16px;color:#ddd;">点击下方按钮在新标签页中查看高清文档</p>
-              <a :href="`${BASE}docs/TJMJ_Technical_Manual.pdf`" target="_blank" class="info-link" style="font-size:18px;color:#ffd700;margin-top:16px;">📄 打开教程文档</a>
-            </div>
-            <!-- 演示视频 -->
-            <div v-if="infoOverlay === 'video'" class="info-video-wrap">
-              <video :src="`${BASE}docs/showcase.mp4`" controls class="info-video" controlsList="nodownload nofullscreen" disableRemotePlayback crossorigin="anonymous" playsinline></video>
-            </div>
-            <!-- 使用协议 -->
-            <div v-if="infoOverlay === 'disclaimer'" class="info-text">
-              <h3>使用协议 / 免责声明</h3>
-              <div class="disclaimer-body">
-                <p>桃江麻将 TJMJ（以下简称"本软件"）是一款仅供个人娱乐和学习用途的网页麻将游戏。</p>
-                <h4>一、禁止赌博</h4>
-                <p>本软件严禁用于任何形式的赌博活动。本软件中的"计分"仅为游戏内娱乐性积分，不涉及任何真实货币或财物交易。任何利用本软件进行赌博的行为均与本软件开发者无关，相关法律责任由行为人自行承担。</p>
-                <h4>二、仅供娱乐</h4>
-                <p>本软件仅供家人朋友娱乐休闲使用，所有游戏规则及实现仅供参考，实际游玩请以当地线下规则为准。</p>
-                <h4>三、免责条款</h4>
-                <p>开发者不保证本软件的完整性、可靠性或适用性。因使用或无法使用本软件所产生的任何直接或间接损失（包括但不限于数据丢失、设备损坏、财产损失），开发者不承担任何责任。</p>
-                <h4>四、二次开发</h4>
-                <p>本项目完全开源，欢迎 Fork / Star / Pull Request。二次开发者须遵守本协议条款，且须在其衍生作品中保留本免责声明。</p>
-                <h4>五、协议更新</h4>
-                <p>开发者保留随时更新本协议的权利，更新后的协议将在本页面公布即生效。</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <!-- 观战模式：输入房间号 -->
         <div class="ready-overlay" v-if="gameState.gamePhase === 'WAITING' && gameMode === 'spectate' && !netState.roomId">
           <div class="lobby-dialog">
@@ -360,6 +327,36 @@
           <div class="action-btn pass active" v-if="actionState.isWaiting" @click="passAction">过</div>
         </div>
 
+      </div>
+    </div>
+
+    <!-- 内容弹窗（教程/视频/协议）—— game-wrapper 外层，避免 transform 影响 fixed 定位 -->
+    <div class="info-overlay" v-if="infoOverlay" @click.self="closeInfo">
+      <div class="info-panel">
+        <button class="info-close" @click="closeInfo">✕</button>
+        <div v-if="infoOverlay === 'manual'" class="info-text" style="text-align:center;display:flex;align-items:center;justify-content:center;flex-direction:column;">
+          <p style="font-size:16px;color:#ddd;">点击下方按钮在新标签页中查看高清文档</p>
+          <a :href="`${BASE}docs/TJMJ_Technical_Manual.pdf`" target="_blank" class="info-link" style="font-size:18px;color:#ffd700;margin-top:16px;">📄 打开教程文档</a>
+        </div>
+        <div v-if="infoOverlay === 'video'" class="info-video-wrap">
+          <video :src="`${BASE}docs/showcase.mp4`" controls class="info-video" controlsList="nodownload nofullscreen" disableRemotePlayback crossorigin="anonymous" playsinline></video>
+        </div>
+        <div v-if="infoOverlay === 'disclaimer'" class="info-text">
+          <h3>使用协议 / 免责声明</h3>
+          <div class="disclaimer-body">
+            <p>桃江麻将 TJMJ（以下简称"本软件"）是一款仅供个人娱乐和学习用途的网页麻将游戏。</p>
+            <h4>一、禁止赌博</h4>
+            <p>本软件严禁用于任何形式的赌博活动。本软件中的"计分"仅为游戏内娱乐性积分，不涉及任何真实货币或财物交易。任何利用本软件进行赌博的行为均与本软件开发者无关，相关法律责任由行为人自行承担。</p>
+            <h4>二、仅供娱乐</h4>
+            <p>本软件仅供家人朋友娱乐休闲使用，所有游戏规则及实现仅供参考，实际游玩请以当地线下规则为准。</p>
+            <h4>三、免责条款</h4>
+            <p>开发者不保证本软件的完整性、可靠性或适用性。因使用或无法使用本软件所产生的任何直接或间接损失（包括但不限于数据丢失、设备损坏、财产损失），开发者不承担任何责任。</p>
+            <h4>四、二次开发</h4>
+            <p>本项目完全开源，欢迎 Fork / Star / Pull Request。二次开发者须遵守本协议条款，且须在其衍生作品中保留本免责声明。</p>
+            <h4>五、协议更新</h4>
+            <p>开发者保留随时更新本协议的权利，更新后的协议将在本页面公布即生效。</p>
+          </div>
+        </div>
       </div>
     </div>
   </div>
