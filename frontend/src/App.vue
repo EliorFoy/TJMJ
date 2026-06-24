@@ -67,8 +67,8 @@
             <!-- 底部图标栏 -->
             <div class="bottom-icons">
               <button class="icon-btn" @click.stop="toggleMusic" :title="musicPlaying ? '暂停音乐' : '播放音乐'">{{ musicPlaying ? '🔊' : '🔇' }}</button>
-              <a class="icon-btn" href="https://github.com/JaiJaiC/TJMJ" target="_blank" title="GitHub 仓库">
-                <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+              <a class="icon-btn" href="https://github.com/JaiJaiC/TJMJ" target="_blank" rel="noopener" title="GitHub 仓库" @click.stop>
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
               </a>
             </div>
           </div>
@@ -499,7 +499,13 @@ const toggleMusic = () => {
     audio.pause();
     musicPlaying.value = false;
   } else {
-    playRandomFrom(currentPlaylist.value);
+    // 直接播放，跳过 playRandomFrom 中间层
+    if (currentPlaylist.value === 'home') {
+      playSong(HOME_SONGS[homeSongIdx]);
+    } else {
+      gameQueue = shuffle(getGameSongs());
+      playSong(gameQueue[0]);
+    }
   }
 };
 
@@ -631,15 +637,20 @@ const getFlatExposed = (pIndex) => {
   return flat;
 };
 
-// 任意玩家全部手牌（含吃碰杠的副露）
+// 任意玩家全部手牌（含吃碰杠的副露 + 胡的那张牌）
 const getWinnerFullHandForShowdown = (pIdx) => {
   if (!gameState.showdownHands) return [];
-  const hand = gameState.showdownHands[pIdx] || [];
+  const hand = [...(gameState.showdownHands[pIdx] || [])];
+  // 抓炮时胡的那张牌不在手牌中，需要额外加入
+  if (lastWinTile.value != null && !hand.includes(lastWinTile.value)) {
+    hand.push(lastWinTile.value);
+  }
   const exposed = getFlatExposed(pIdx);
   return [...exposed, ...hand].sort((a, b) => a - b);
 };
 
 const lastWinnerIdx = ref(-1); // 记录最后赢家，用于高亮
+const lastWinTile = ref(null);  // 最后赢的那张牌（抓炮时不在手牌中）
 
 // 生成吃牌按钮标签（如 "23"、"35"、"56"）
 const getChiLabel = (combo) => {
@@ -1673,7 +1684,7 @@ const executeNpcAction = (npcIndex, actionType, targetTile, discarderIndex = -1)
     if (actionType === 'hu') {
        const scoreRes = HuCalculator.checkHu([...hand, targetTile], gameState.wangTile, gameState.diTile, false);
        speak('hu');
-       finalizeHu(npcIndex, scoreRes, false, discarderIndex >= 0 ? discarderIndex : npcIndex);
+       finalizeHu(npcIndex, scoreRes, false, discarderIndex >= 0 ? discarderIndex : npcIndex, targetTile);
     } else if (actionType === 'gang') {
        // 【抢杠检测】NPC明杠前检查是否有人能胡
        const robbers = checkRobGang(npcIndex, targetTile);
@@ -1903,12 +1914,14 @@ const executePlayerHu = (handToCheck, isSelfDraw, discarderIndex = -1) => {
     return;
   }
 
-  finalizeHu(0, result, isSelfDraw, discarderIndex);
+  const winTile = handToCheck[handToCheck.length - 1];
+  finalizeHu(0, result, isSelfDraw, discarderIndex, winTile);
 };
 
 // 最终结算胡牌
 // sourceDiscarderIndex: 抓炮时打出牌的人的index（自摸时为 -1）
-const finalizeHu = (playerIndex, huResult, isSelfDraw, sourceDiscarderIndex = -1) => {
+// winTile: 胡的那张牌（抓炮时需要额外加入手牌）
+const finalizeHu = (playerIndex, huResult, isSelfDraw, sourceDiscarderIndex = -1, winTile = null) => {
   // 扎鸟（仅展示，不计分）
   zhaNiao(playerIndex);
   const niaoInfo = gameState.zhaNiaoResult;
@@ -1936,8 +1949,9 @@ const finalizeHu = (playerIndex, huResult, isSelfDraw, sourceDiscarderIndex = -1
     });
   }
 
-  // 记录赢家，直接亮牌
+  // 记录赢家+赢牌，直接亮牌
   lastWinnerIdx.value = playerIndex;
+  lastWinTile.value = winTile;
   settlement.active = false;
   gameState.pendingDiHuChoice = null;
   gameState.gamePhase = 'WAITING';
@@ -2177,9 +2191,9 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .showdown-row { display: flex; align-items: center; gap: 10px; margin: 6px 0; background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 6px; }
 .showdown-name { font-size: 13px; font-weight: bold; min-width: 40px; }
 .showdown-tiles { display: flex; gap: 2px; flex-wrap: wrap; flex: 1; }
-.showdown-tile-wrapper { position: relative; width: 24px; height: 34px; display: inline-block; margin-right: 2px; }
-.showdown-tile-bg { position: absolute; top: 0; left: -32px; width: 24px; height: 34px; }
-.showdown-tile-face { position: absolute; top: -1px; left: -30px; width: 20px; height: 30px; }
+.showdown-tile-wrapper { position: relative; width: 22px; height: 32px; display: inline-block; margin-right: 1px; }
+.showdown-tile-bg { position: absolute; top: 0; left: 28px; width: 24px; height: 34px; }
+.showdown-tile-face { position: absolute; top: 1px; left: 30px; width: 20px; height: 30px; }
 
 /* showdown 赢家行高亮 */
 .showdown-row.winner-row { background: rgba(255,215,0,0.2); border-radius: 8px; padding: 4px 8px; }
