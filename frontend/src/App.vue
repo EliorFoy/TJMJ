@@ -374,7 +374,7 @@ import { calculateWang } from './core/constants.js';
 import { HuCalculator } from './core/HuCalculator.js';
 import { RuleChecker } from './core/RuleChecker.js';
 import { NpcStrategy } from './ai/NpcStrategy.js';
-import { speak, playDong, playWin } from './utils/speech.js';
+import { speak, playDong, playWin, speakTile } from './utils/speech.js';
 import { connect, send, on, off, netState, disconnect } from './network/client.js';
 
 // 【核心解法】动态读取环境路径，彻底消灭 404！
@@ -1719,6 +1719,7 @@ const playTile = (index) => {
   gameState.selectedTileIndex = -1;
   clearTimeout(turnTimer);
   playDong();
+  speakTile(val); // 播报牌名
   if (gameMode.value === 'multi') {
     gameState.discards.push({ value: val }); // 本地先显示
     multiDiscard(val);
@@ -1743,6 +1744,7 @@ const npcPlayPhase = (playerIndex) => {
   }
   gameState.npcTileCounts[playerIndex] = hand.length;
   playDong();
+  if (tileToPlay) speakTile(tileToPlay);
   // 观战模式：同步视角
   if (gameMode.value === 'spectate') {
     gameState.handTiles = [...(gameState.npcHands[spectateView.value] || [])];

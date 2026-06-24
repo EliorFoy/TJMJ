@@ -1,44 +1,79 @@
 // src/utils/speech.js
-// 使用浏览器内置 Web Speech API + Web Audio API 播报游戏音效
+// 优先使用预录制音频（public/sfx/），降级为浏览器 TTS
 
-// 语音配置
-const SPEECH_CONFIG = {
-  lang: 'zh-CN',
-  rate: 0.9,
-  pitch: 1.1,
-  volume: 0.8,
+const BASE = import.meta.env.BASE_URL || '/';
+
+// 本地音频缓存（防止重复加载）
+const audioCache = {};
+
+const loadAudio = (path) => {
+  if (audioCache[path]) return audioCache[path];
+  const a = new Audio();
+  a.preload = 'auto';
+  a.src = path;
+  audioCache[path] = a;
+  return a;
 };
 
-const EVENT_SPEECH = {
-  peng: '碰！',
-  gang: '杠！',
-  angang: '暗杠！',
-  minggang: '明杠！',
-  hu: '胡了！',
-  zimo: '自摸！',
-  chi: '吃！',
-  pass: '过！',
-  ting: '听牌！',
+// 动作音效映射
+const SFX = {
+  chi:    'sfx/chi.mp3',
+  peng:   'sfx/peng.mp3',
+  gang:   'sfx/gang.mp3',
+  angang: 'sfx/angang.mp3',
+  minggang: 'sfx/minggang.mp3',
+  hu:     'sfx/hu.mp3',
+  zimo:   'sfx/zimo.mp3',
+  pass:   'sfx/pass.mp3',
+};
+
+// 牌名 → 文件名映射
+const tileNames = {
+  11:'一万',12:'二万',13:'三万',14:'四万',15:'五万',16:'六万',17:'七万',18:'八万',19:'九万',
+  21:'一条',22:'二条',23:'三条',24:'四条',25:'五条',26:'六条',27:'七条',28:'八条',29:'九条',
+  31:'一筒',32:'二筒',33:'三筒',34:'四筒',35:'五筒',36:'六筒',37:'七筒',38:'八筒',39:'九筒',
 };
 
 let speechEnabled = true;
 
-/** 播放语音 */
+/** 播放预录制音效（存在则播，否则降级 TTS） */
+const playSfx = (path) => {
+  if (!speechEnabled) return;
+  try {
+    const a = loadAudio(`${BASE}${path}`);
+    a.currentTime = 0;
+    a.play().catch(() => {});
+  } catch(e) {}
+};
+
+/** 播放动作语音（吃碰杠胡等） */
 export const speak = (event, customText = null) => {
   if (!speechEnabled) return;
+  const path = SFX[event];
+  if (path) {
+    playSfx(path);
+    return;
+  }
+  // TTS 降级
   if (!window.speechSynthesis) return;
-  const text = customText || EVENT_SPEECH[event];
+  const text = customText || event;
   if (!text) return;
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
-  u.lang = SPEECH_CONFIG.lang;
-  u.rate = SPEECH_CONFIG.rate;
-  u.pitch = SPEECH_CONFIG.pitch;
-  u.volume = SPEECH_CONFIG.volume;
-  try { window.speechSynthesis.speak(u); } catch (e) {}
+  u.lang = 'zh-CN'; u.rate = 0.9; u.pitch = 1.1; u.volume = 0.8;
+  try { window.speechSynthesis.speak(u); } catch(e) {}
 };
 
-/** "咚" 出牌音效 — Web Audio API 短促打击音 */
+/** 播报牌名（出牌时用） */
+export const speakTile = (tileValue) => {
+  if (!speechEnabled) return;
+  const name = tileNames[tileValue];
+  if (!name) return;
+  // 尝试预录制文件 sfx/tile_XX.mp3
+  playSfx(`sfx/tile_${tileValue}.mp3`);
+};
+
+/** "咚" 出牌音效 */
 export const playDong = () => {
   if (!speechEnabled) return;
   try {
@@ -50,30 +85,16 @@ export const playDong = () => {
     osc.frequency.exponentialRampToValueAtTime(200, ctx.currentTime + 0.15);
     gain.gain.setValueAtTime(0.6, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.2);
-    osc.connect(gain);
-    gain.connect(ctx.destination);
+    osc.connect(gain); gain.connect(ctx.destination);
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + 0.2);
-  } catch (e) {}
+  } catch(e) {}
 };
 
 /** "好运来" 胡牌音效 */
 export const playWin = () => {
-  if (!speechEnabled) return;
-  if (!window.speechSynthesis) return;
-  window.speechSynthesis.cancel();
-  // 先说"好运来"
-  const u1 = new SpeechSynthesisUtterance('好运来！');
-  u1.lang = 'zh-CN';
-  u1.rate = 0.7;
-  u1.pitch = 1.4;
-  u1.volume = 1.0;
-  try { window.speechSynthesis.speak(u1); } catch (e) {}
+  playSfx('sfx/win.mp3');
 };
 
-export const toggleSpeech = () => {
-  speechEnabled = !speechEnabled;
-  return speechEnabled;
-};
-
+export const toggleSpeech = () => { speechEnabled = !speechEnabled; return speechEnabled; };
 export const isSpeechEnabled = () => speechEnabled;
