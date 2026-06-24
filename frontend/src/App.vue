@@ -621,24 +621,25 @@ const openEmojiPicker = (playerIndex) => {
 // === 头像选择器 ===
 const showAvatarPicker = ref(false);
 const avatarFileInput = ref(null);
+const applyAvatar = (avatar) => {
+  const myIdx = gameMode.value === 'multi' ? netState.playerIndex : 0;
+  gameState.players[myIdx].avatar = avatar;
+  localStorage.setItem('tjmj_avatar', avatar);
+  showAvatarPicker.value = false;
+  // 联机模式：通知服务器同步给其他玩家
+  if (gameMode.value === 'multi' && netState.roomId) {
+    send({ type: 'update_avatar', avatar });
+  }
+};
 const loadCustomAvatar = (e) => {
   const file = e.target.files?.[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = () => {
-    const myIdx = gameMode.value === 'multi' ? netState.playerIndex : 0;
-    gameState.players[myIdx].avatar = reader.result;
-    localStorage.setItem('tjmj_avatar', reader.result);
-    showAvatarPicker.value = false;
-  };
+  reader.onload = () => { applyAvatar(reader.result); };
   reader.readAsDataURL(file);
 };
 const selectPresetAvatar = (num) => {
-  const key = `${num}.表情包`;
-  const myIdx = gameMode.value === 'multi' ? netState.playerIndex : 0;
-  gameState.players[myIdx].avatar = key;
-  localStorage.setItem('tjmj_avatar', key);
-  showAvatarPicker.value = false;
+  applyAvatar(`${num}.表情包`);
 };
 const restoreAvatar = () => {
   const saved = localStorage.getItem('tjmj_avatar');
@@ -1418,6 +1419,10 @@ const setupNetworkListeners = () => {
   });
   on('player_ready_next', (msg) => {
     readyNextCount.value = msg.ready.filter(r => r).length;
+  });
+
+  on('avatar_updated', (msg) => {
+    gameState.players[msg.from].avatar = msg.avatar;
   });
 
   on('emoji_from', (msg) => {
@@ -2450,7 +2455,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 
 /* 头像选择器 */
 .avatar-picker-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; height: 100dvh; background: rgba(0,0,0,0.3); z-index: 9999999; display: flex; align-items: center; justify-content: center; }
-.avatar-picker-panel { background: #1a1a2e; border: 2px solid #ffd700; border-radius: 12px; padding: 20px; text-align: center; max-width: 360px; width: 90vw; }
+.avatar-picker-panel { background: #1a1a2e; border: 2px solid #ffd700; border-radius: 12px; padding: 20px; text-align: center; max-width: 360px; width: 90vw; margin: auto; }
 .avatar-picker-panel h3 { color: #ffd700; margin: 0 0 14px; font-size: 16px; }
 .avatar-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
 .avatar-option { width: 100%; aspect-ratio: 1; border-radius: 10px; border: 2px solid #444; cursor: pointer; background: #fff; object-fit: cover; transition: 0.15s; }

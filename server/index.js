@@ -199,6 +199,15 @@ wss.on('connection', (ws) => {
         break;
       }
 
+      // 头像更新同步
+      case 'update_avatar': {
+        if (myRoom && myPlayerIndex >= 0) {
+          myRoom.players[myPlayerIndex].avatar = msg.avatar;
+          myRoom.broadcast({ type: 'avatar_updated', from: myPlayerIndex, avatar: msg.avatar });
+        }
+        break;
+      }
+
       // 心跳保活
       case 'ping': {
         try { ws.send(JSON.stringify({ type: 'pong' })); } catch(e) {}
