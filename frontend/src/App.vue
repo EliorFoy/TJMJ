@@ -251,38 +251,6 @@
           </div>
         </div>
 
-        <!-- 手动结算界面 -->
-        <div class="settlement-overlay" v-if="settlement.active && settlement.winnerIndex >= 0">
-          <div class="settlement-panel">
-            <h3>💰 手动结算</h3>
-            <p :style="{ color: '#ffd700', fontWeight: 'bold', fontSize: '18px' }">{{ gameState.players[settlement.winnerIndex]?.name }} 胡牌！🎉</p>
-            <div class="settlement-row" v-for="(p, idx) in gameState.players" :key="'pay'+idx" :class="{ 'winner-row': idx === settlement.winnerIndex }">
-              <span class="settlement-name" :class="{ 'winner-name': idx === settlement.winnerIndex }">{{ p.name }}</span>
-              <!-- 赢家全部手牌 -->
-              <span v-if="idx === settlement.winnerIndex && gameState.showdownHands" class="settlement-winner-tiles">
-                <span v-for="t in getWinnerFullHand()" :key="'wintile'+t" class="showdown-tile-wrapper">
-                  <img :src="getImg('3d/lay_1.png')" class="showdown-tile-bg" />
-                  <img :src="getImg(`tiles/${t}.png`)" class="showdown-tile-face" />
-                </span>
-              </span>
-              <span v-if="idx === settlement.winnerIndex" class="settlement-winner">🎉 赢家</span>
-              <template v-else>
-                <button class="settlement-pay-btn" @click="openNumpad(idx)">
-                  {{ settlement.payments[idx] > 0 ? '已付 '+settlement.payments[idx]+' 分' : '点击支付' }}
-                </button>
-                <button class="settlement-confirm-btn" @click="confirmPayment(idx)"
-                  :disabled="settlement.payments[idx] <= 0">
-                  {{ settlement.confirmed[idx] ? '✓ 已确认' : '确认' }}
-                </button>
-              </template>
-            </div>
-            <button class="btn-ready" @click="nextRoundOrFinish"
-              :disabled="![0,1,2,3].every(i => i === settlement.winnerIndex || settlement.confirmed[i])">
-              继续
-            </button>
-          </div>
-        </div>
-
         <!-- 数字键盘 -->
         <div class="numpad-overlay" v-if="settlement.numpadFor >= 0" @click.stop>
           <div class="numpad-panel">
@@ -297,14 +265,14 @@
           </div>
         </div>
 
-        <!-- 亮牌展示（胡牌后显示四家手牌） -->
-        <div class="showdown-overlay" v-if="gameState.showdownHands && !settlement.active && (gameState.gamePhase === 'WAITING' || gameState.gamePhase === 'SETTLEMENT')">
+        <!-- 本局结果（胡牌后直接显示，赢家高亮 + 完整14张牌） -->
+        <div class="showdown-overlay" v-if="gameState.showdownHands && (gameState.gamePhase === 'WAITING' || gameState.gamePhase === 'SETTLEMENT')">
           <div class="showdown-panel">
-            <h3>🏆 本局结果</h3>
-            <div class="showdown-row" v-for="(p, idx) in gameState.players" :key="idx">
-              <span class="showdown-name">{{ p.name }}</span>
+            <h3>🏆 本局结果 — {{ gameState.players[lastWinnerIdx]?.name || '' }} 胡牌！</h3>
+            <div class="showdown-row" v-for="(p, idx) in gameState.players" :key="idx" :class="{ 'winner-row': idx === lastWinnerIdx }">
+              <span class="showdown-name" :class="{ 'winner-name': idx === lastWinnerIdx }">{{ p.name }}</span>
               <span class="showdown-tiles">
-                <span v-for="t in gameState.showdownHands[idx]" :key="t" class="showdown-tile-wrapper">
+                <span v-for="t in (idx === lastWinnerIdx ? getWinnerFullHandForShowdown(idx) : gameState.showdownHands[idx])" :key="t" class="showdown-tile-wrapper">
                   <img :src="getImg('3d/lay_1.png')" class="showdown-tile-bg" />
                   <img :src="getImg(`tiles/${t}.png`)" class="showdown-tile-face" />
                 </span>
@@ -449,46 +417,15 @@ const getGameSongs = () => gameGenre.value === 'o' ? O_SONGS : GAME_SONGS;
 const shuffle = (arr) => { const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
 // Web Audio 音量压缩器（统一所有歌曲音量）
-let _audioCtx = null;
-let _compressor = null;
-let _sourceNode = null;
-let _ctxPromise = null; // 缓存初始化 promise，避免重复 await
-const _ensureAudioCtx = () => {
-  if (_ctxPromise) return _ctxPromise;
-  _ctxPromise = (async () => {
-    if (!_audioCtx) {
-      _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      _compressor = _audioCtx.createDynamicsCompressor();
-      _compressor.threshold.value = -24;
-      _compressor.knee.value = 30;
-      _compressor.ratio.value = 12;
-      _compressor.attack.value = 0.003;
-      _compressor.release.value = 0.25;
-      _compressor.connect(_audioCtx.destination);
-    }
-    if (_audioCtx.state === 'suspended') {
-      try { await _audioCtx.resume(); } catch(e) {}
-    }
-  })();
-  return _ctxPromise;
-};
-const _connectBgmCompressor = (audio) => {
-  if (!_audioCtx || !_compressor) return;
-  if (_sourceNode) return; // 已连接，跳过（同一 audio 元素只需连一次）
-  try {
-    _sourceNode = _audioCtx.createMediaElementSource(audio);
-    _sourceNode.connect(_compressor);
-  } catch(e) { _sourceNode = null; }
-};
+// BGM 直接使用原生 audio 元素，不经过 AudioContext（避免兼容性问题）
+let _micCtx = null; // 仅麦克风使用
 
 const playSong = (filename) => {
   const audio = bgMusic.value;
   if (!audio) return;
-  _ensureAudioCtx(); // fire-and-forget，不阻塞
   audio.src = `/TJMJ/${encodeURI(filename)}`;
   audio.volume = 0.65;
   audio.load();
-  _connectBgmCompressor(audio);
   audio.play().then(() => {
     musicPlaying.value = true;
   }).catch((e) => {
@@ -694,15 +631,15 @@ const getFlatExposed = (pIndex) => {
   return flat;
 };
 
-// 赢家全部手牌（含吃碰杠的副露）
-const getWinnerFullHand = () => {
+// 任意玩家全部手牌（含吃碰杠的副露）
+const getWinnerFullHandForShowdown = (pIdx) => {
   if (!gameState.showdownHands) return [];
-  const w = settlement.winnerIndex;
-  if (w < 0) return [];
-  const hand = gameState.showdownHands[w] || [];
-  const exposed = getFlatExposed(w);
+  const hand = gameState.showdownHands[pIdx] || [];
+  const exposed = getFlatExposed(pIdx);
   return [...exposed, ...hand].sort((a, b) => a - b);
 };
+
+const lastWinnerIdx = ref(-1); // 记录最后赢家，用于高亮
 
 // 生成吃牌按钮标签（如 "23"、"35"、"56"）
 const getChiLabel = (combo) => {
@@ -903,9 +840,11 @@ const rtcConfig = {
 const startMicLevelMonitor = async (stream) => {
   try {
     await _ensureAudioCtx();
-    analyserNode = _audioCtx.createAnalyser();
+    if (!_micCtx) _micCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (_micCtx.state === 'suspended') _micCtx.resume();
+    analyserNode = _micCtx.createAnalyser();
     analyserNode.fftSize = 256;
-    const source = _audioCtx.createMediaStreamSource(stream);
+    const source = _micCtx.createMediaStreamSource(stream);
     source.connect(analyserNode);
     const dataArray = new Uint8Array(analyserNode.frequencyBinCount);
     const tick = () => {
@@ -1062,8 +1001,8 @@ const closeAllPeerConnections = () => {
     localStream.value = null;
   }
   // 暂停 AudioContext（iOS 要求）
-  if (_audioCtx) {
-    try { _audioCtx.suspend(); } catch(e) {}
+  if (_micCtx) {
+    try { _micCtx.suspend(); } catch(e) {}
   }
 };
 
@@ -1986,32 +1925,22 @@ const finalizeHu = (playerIndex, huResult, isSelfDraw, sourceDiscarderIndex = -1
   playWin();
   speak(isSelfDraw ? 'zimo' : 'hu');
 
-  // 启动手动结算
-  settlement.active = true;
-  settlement.winnerIndex = playerIndex;
-  settlement.payments = [0, 0, 0, 0];
-  settlement.confirmed = [false, false, false, false];
-  // NPC自动支付随机金额并确认
-  setTimeout(() => {
+  // 自动计分结算
+  if (gameMode.value === 'single') {
     [0,1,2,3].forEach(i => {
-      if (i !== playerIndex && gameMode.value === 'single') {
-        settlement.payments[i] = Math.floor(Math.random() * 10) + 1;
-        gameState.players[playerIndex].score += settlement.payments[i];
-        gameState.players[i].score -= settlement.payments[i];
-        settlement.confirmed[i] = true;
+      if (i !== playerIndex) {
+        const pay = Math.floor(Math.random() * 10) + 1;
+        gameState.players[playerIndex].score += pay;
+        gameState.players[i].score -= pay;
       }
     });
-  }, 1500);
-
-  // 展��扎鸟信息
-  let msg = `${gameState.players[playerIndex].name} 胡牌了！(${huResult.type})`;
-  if (niaoInfo && niaoInfo.niaoTile) {
-    msg += `\n🀄 扎鸟：${niaoInfo.niaoTile % 10} → ${niaoInfo.type}`;
   }
-  msg += `\n请其他玩家点击赢家分数，手动输入支付金额`;
 
+  // 记录赢家，直接亮牌
+  lastWinnerIdx.value = playerIndex;
+  settlement.active = false;
   gameState.pendingDiHuChoice = null;
-  gameState.gamePhase = 'SETTLEMENT';
+  gameState.gamePhase = 'WAITING';
 };
 
 const handleHu = () => {
@@ -2249,8 +2178,14 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .showdown-name { font-size: 13px; font-weight: bold; min-width: 40px; }
 .showdown-tiles { display: flex; gap: 2px; flex-wrap: wrap; flex: 1; }
 .showdown-tile-wrapper { position: relative; width: 24px; height: 34px; display: inline-block; margin-right: 2px; }
-.showdown-tile-bg { position: absolute; top: 0; left: 0; width: 24px; height: 34px; }
-.showdown-tile-face { position: absolute; top: 2px; left: 2px; width: 20px; height: 30px; }
+.showdown-tile-bg { position: absolute; top: 0; left: -32px; width: 24px; height: 34px; }
+.showdown-tile-face { position: absolute; top: -1px; left: -30px; width: 20px; height: 30px; }
+
+/* showdown 赢家行高亮 */
+.showdown-row.winner-row { background: rgba(255,215,0,0.2); border-radius: 8px; padding: 4px 8px; }
+.showdown-name.winner-name { color: #ffd700; font-weight: bold; text-shadow: 0 0 6px rgba(255,215,0,0.5); }
+
+/* 删掉原来的结算相关样式 */
 .showdown-tile-bg { position: absolute; width: 100%; height: 100%; z-index: 0; }
 .showdown-tile-face { position: absolute; top: 1px; left: 85%; transform: translate(-35%); width: 19px; height: 26px; z-index: 2; }
 .showdown-score { font-size: 14px; font-weight: bold; min-width: 45px; text-align: right; }
