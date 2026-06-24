@@ -9,6 +9,8 @@
     </div>
 
     <div id="game-wrapper">
+      <!-- 左上角刷新按钮（保留房间状态） -->
+      <button class="refresh-btn" @click="safeRefresh" title="刷新页面（保留房间）">↻</button>
       <div class="mahjong-desk" :class="{ 'in-menu': isInMenu }">
 
         <!-- 控制按钮：游戏中显示全部 -->
@@ -52,10 +54,10 @@
               <span class="anime-emoji a5">🎵</span>
               <span class="anime-emoji a6">✨</span>
             </div>
-            <button class="mode-btn" @click="enterGame('single')">单人模式</button>
+            <button class="mode-btn" @click="enterGame('single')">单机模式</button>
             <button class="mode-btn" @click="enterGame('multi')">联机模式</button>
             <button class="mode-btn" @click="enterGame('spectate')">观战模式</button>
-            <button class="mode-btn test-mode-btn" @click="enterGame('test')" disabled title="测试模式暂未开放">测试模式</button>
+            <button class="mode-btn test-mode-btn" @click="enterGame('test')" disabled title="其他玩法暂未开放">其他玩法</button>
             <div class="info-links">
               <a class="info-link" :href="`${BASE}docs/TJMJ_Technical_Manual.pdf`" target="_blank">教程文档</a>
               <a class="info-link" @click="openInfo('video')">演示视频</a>
@@ -314,7 +316,7 @@
                 {{ p.name }}: {{ p.score >= 0 ? '+' : '' }}{{ p.score }}
               </span>
             </div>
-            <button class="btn-ready" @click="nextRoundOrFinish">{{ gameState.roundNumber >= 16 ? '🏆 查看最终排名' : '▶ 下一局' }}</button>
+            <button class="btn-ready" @click="startNextRoundFromShowdown">{{ gameState.roundNumber >= 16 ? '🏆 查看最终排名' : '▶ 下一局' }}</button>
           </div>
         </div>
 
@@ -1160,15 +1162,42 @@ const joinRoom = async () => {
   multiState.joining = false;
 };
 
+// 安全刷新：保留房间信息到 URL 参数，刷新后自动重连
+const safeRefresh = () => {
+  const roomId = netState.roomId || settlement.winnerIndex >= 0 ? '' : '';
+  if (netState.roomId) {
+    const url = new URL(location.href);
+    url.searchParams.set('auto_join', netState.roomId);
+    url.searchParams.set('name', multiState.playerName);
+    location.replace(url.toString());
+  } else {
+    location.reload();
+  }
+};
+
+// 记录房间信息到 URL（用于断线重进）
+const rememberRoomInUrl = (roomId) => {
+  const url = new URL(location.href);
+  url.searchParams.set('auto_join', roomId);
+  url.searchParams.set('name', multiState.playerName);
+  history.replaceState(null, '', url.toString());
+};
+
 const leaveRoom = () => {
   closeAllPeerConnections();
   disconnect();
   netState.roomId = null;
+  // 清除 URL 中的房间信息
+  const url = new URL(location.href);
+  url.searchParams.delete('auto_join');
+  url.searchParams.delete('name');
+  history.replaceState(null, '', url.toString());
 };
 
 const setupNetworkListeners = () => {
   on('room_created', (msg) => {
     multiState.roomId = msg.roomId;
+    rememberRoomInUrl(msg.roomId);
     gameState.readyStatus[0] = true;
     myPlayerIndexForChat.value = msg.playerIndex;
     if (micEnabled.value) setupVoiceWithRoom();
@@ -1176,6 +1205,7 @@ const setupNetworkListeners = () => {
 
   on('room_joined', (msg) => {
     multiState.roomId = msg.roomId;
+    rememberRoomInUrl(msg.roomId);
     gameState.readyStatus[0] = true;
     myPlayerIndexForChat.value = msg.playerIndex;
     // 如果麦克风已开，建立语音连接
@@ -1370,8 +1400,17 @@ const nextRoundOrFinish = () => {
   gameState.dealerIndex = settlement.winnerIndex >= 0 ? settlement.winnerIndex : (gameState.dealerIndex + 1) % 4;
   if (gameMode.value === 'single') {
     gameState.gamePhase = 'WAITING';
-    setTimeout(() => handleReady(), 200);
+    // 不自动开始，等用户点击摊牌界面的"下一局"
   }
+};
+
+const startNextRoundFromShowdown = () => {
+  if (gameState.roundNumber >= 16) {
+    nextRoundOrFinish();
+    return;
+  }
+  gameState.showdownHands = null;
+  handleReady();
 };
 
 const startRound = () => {
@@ -2208,7 +2247,9 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .showdown-row { display: flex; align-items: center; gap: 10px; margin: 6px 0; background: rgba(255,255,255,0.1); padding: 4px 8px; border-radius: 6px; }
 .showdown-name { font-size: 13px; font-weight: bold; min-width: 40px; }
 .showdown-tiles { display: flex; gap: 2px; flex-wrap: wrap; flex: 1; }
-.showdown-tile-wrapper { position: relative; width: 24px; height: 34px; display: inline-block; }
+.showdown-tile-wrapper { position: relative; width: 24px; height: 34px; display: inline-block; margin-right: 2px; }
+.showdown-tile-bg { position: absolute; top: 0; left: 0; width: 24px; height: 34px; }
+.showdown-tile-face { position: absolute; top: 2px; left: 2px; width: 20px; height: 30px; }
 .showdown-tile-bg { position: absolute; width: 100%; height: 100%; z-index: 0; }
 .showdown-tile-face { position: absolute; top: 1px; left: 85%; transform: translate(-35%); width: 19px; height: 26px; z-index: 2; }
 .showdown-score { font-size: 14px; font-weight: bold; min-width: 45px; text-align: right; }
@@ -2342,9 +2383,9 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .settlement-name.winner-name { color: #ffd700; font-size: 16px; text-shadow: 0 0 8px rgba(255,215,0,0.6); }
 .settlement-winner { color: #ffd700; font-size: 14px; }
 .settlement-winner-tiles { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; margin: 10px 0; }
-.settlement-winner-tiles .showdown-tile-wrapper { width: 32px; height: 44px; position: relative; }
-.settlement-winner-tiles .showdown-tile-bg { width: 32px; height: 44px; position: absolute; }
-.settlement-winner-tiles .showdown-tile-face { width: 28px; height: 40px; position: absolute; top: 2px; left: 2px; }
+.settlement-winner-tiles .showdown-tile-wrapper { width: 32px; height: 44px; position: relative; display: inline-block; }
+.settlement-winner-tiles .showdown-tile-bg { width: 32px; height: 44px; position: absolute; top: 0; left: 32px; }
+.settlement-winner-tiles .showdown-tile-face { width: 32px; height: 44px; position: absolute; top: 0; left: 0; }
 .settlement-pay-btn { padding: 6px 14px; font-size: 13px; background: linear-gradient(145deg, #ff9800, #f57c00); border: none; border-radius: 8px; color: white; cursor: pointer; font-weight: bold; }
 .settlement-confirm-btn { padding: 6px 10px; font-size: 12px; background: #555; border: 1px solid #888; border-radius: 8px; color: white; cursor: pointer; margin-left: 4px; }
 .settlement-confirm-btn:disabled { opacity: 0.3; cursor: default; }
@@ -2374,8 +2415,16 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 
 /* ===== 顶部控制栏（BGM / 语音 / 聊天，在游戏区域内） ===== */
 .top-controls { position: absolute; top: 10px; right: 100px; z-index: 99999; display: flex; gap: 3px; }
+
+/* 左上角刷新按钮 */
+.refresh-btn { position: absolute; top: 8px; left: 12px; z-index: 99999; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #aaa; font-size: 18px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+.refresh-btn:hover { background: rgba(0,0,0,0.6); color: #ffd700; border-color: #ffd700; }
 /* 首页：BGM按钮居中略偏左，不挡"桃"字 */
 .top-controls { position: absolute; top: 10px; right: 100px; z-index: 99999; display: flex; gap: 3px; }
+
+/* 左上角刷新按钮 */
+.refresh-btn { position: absolute; top: 8px; left: 12px; z-index: 99999; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #aaa; font-size: 18px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+.refresh-btn:hover { background: rgba(0,0,0,0.6); color: #ffd700; border-color: #ffd700; }
 .ctrl-btn { background: rgba(0,0,0,0.4); color: white; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 2px 6px; font-size: 15px; cursor: pointer; display: flex; align-items: center; gap: 2px; }
 .ctrl-btn:hover { background: rgba(0,0,0,0.7); }
 
