@@ -578,7 +578,7 @@ const dragOverIndex = ref(-1); // 拖拽悬停的目标索引
 
 // 昵称记忆 & 随机
 const showMemory = ref(false);
-const memoryNames = ['cjj','zzw','xjh','xjt','lsy','syy','hj','hlh','cyh'];
+const memoryNames = ['cjj','zzw','xjh','xjt','lsy','syy','hj','hlh','cyh','lem','cjl','mjl'];
 const randomNames = ['祖国人','内向小男孩','乡里人','城里人','花开富贵','奥特曼','如来佛','机器人','最强NPC','AI','路障僵尸','阿强','阿珍','阿贵','超鬼','奥利给','球草','球花'];
 let lastRollIdx = -1;
 const rollNickname = () => {
@@ -2093,7 +2093,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .nick-btn:hover { background: rgba(255,255,255,0.18); color: #ffd700; border-color: #ffd700; }
 /* 记忆弹出框 */
 .memory-wrap { position: relative; }
-.memory-popup { position: absolute; right: calc(100% + 8px); top: 0; background: #1a1a2e; border: 1px solid #444; border-radius: 8px; padding: 8px; display: flex; flex-wrap: wrap; gap: 5px; width: 140px; z-index: 99; justify-content: center; }
+.memory-popup { position: absolute; right: calc(100% + 8px); top: 0; background: #1a1a2e; border: 1px solid #444; border-radius: 8px; padding: 8px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; width: 155px; z-index: 99; }
 .memory-chip { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #ddd; font-size: 13px; padding: 5px 10px; cursor: pointer; transition: all 0.15s; white-space: nowrap; text-align: center; }
 .memory-chip:hover { background: #ffd700; color: #1a1a2e; border-color: #ffd700; }
 .lobby-btn { display: block; width: 250px; margin: 10px auto; padding: 12px; font-size: 16px; font-weight: bold; border: none; border-radius: 12px; cursor: pointer; color: white; transition: 0.2s; }
@@ -2308,9 +2308,9 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .dihu-btn:active { transform: scale(0.95); }
 
 /* ===== 顶部控制栏（BGM / 语音 / 聊天，在游戏区域内） ===== */
-.top-controls { position: absolute; top: 20px; right: 100px; z-index: 99999; display: flex; gap: 3px; }
+.top-controls { position: absolute; top: 10px; right: 100px; z-index: 99999; display: flex; gap: 3px; }
 /* 首页：BGM按钮居中略偏左，不挡"桃"字 */
-.top-controls { position: absolute; top: 20px; right: 100px; z-index: 99999; display: flex; gap: 3px; }
+.top-controls { position: absolute; top: 10px; right: 100px; z-index: 99999; display: flex; gap: 3px; }
 .ctrl-btn { background: rgba(0,0,0,0.4); color: white; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 2px 6px; font-size: 15px; cursor: pointer; display: flex; align-items: center; gap: 2px; }
 .ctrl-btn:hover { background: rgba(0,0,0,0.7); }
 
