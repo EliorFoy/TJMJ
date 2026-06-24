@@ -57,7 +57,7 @@
             <button class="mode-btn" @click="enterGame('spectate')">观战模式</button>
             <button class="mode-btn test-mode-btn" @click="enterGame('test')" :disabled="isMobileDevice" :title="isMobileDevice ? '测试模式仅支持电脑端' : ''">测试模式</button>
             <div class="info-links">
-              <a class="info-link" @click="openInfo('manual')">教程文档</a>
+              <a class="info-link" :href="`${BASE}docs/TJMJ_Technical_Manual.pdf`" target="_blank">教程文档</a>
               <a class="info-link" @click="openInfo('video')">演示视频</a>
               <a class="info-link" @click="openInfo('disclaimer')">使用协议</a>
             </div>
@@ -1008,14 +1008,7 @@ const closeInfo = () => {
 };
 onMounted(async () => {
   updateGameScale();
-  // 首页BGM：首次用户点击时启动（浏览器要求用户手势才能播放）
-  const startBgmOnTouch = () => {
-    tryAutoPlay();
-    document.removeEventListener('click', startBgmOnTouch);
-    document.removeEventListener('touchstart', startBgmOnTouch);
-  };
-  document.addEventListener('click', startBgmOnTouch);
-  document.addEventListener('touchstart', startBgmOnTouch);
+  // BGM 默认关闭，需手动点击按钮开启
   const params = new URLSearchParams(location.search);
   const autoJoin = params.get('auto_join');
   if (autoJoin) {
@@ -2024,8 +2017,8 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 }
 
 /* 首页底部教程链接 */
-.info-links { display: flex; justify-content: center; gap: 28px; margin-top: 22px; }
-.info-link { font-size: 13px; color: #aaa; cursor: pointer; text-decoration: none; transition: color 0.2s; }
+.info-links { display: flex; justify-content: center; gap: 28px; margin-top: 22px; width: 100%; }
+.info-link { font-size: 13px; color: #aaa; cursor: pointer; text-decoration: none; transition: color 0.2s; white-space: nowrap; }
 .info-link:hover { color: #ffd700; text-decoration: underline; }
 
 /* 内容弹窗（竖屏，右上X关闭） */
@@ -2036,7 +2029,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .info-iframe { width: 100%; height: 100%; border: none; }
 .info-video-wrap { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #000; }
 .info-video { max-width: 100%; max-height: 100%; outline: none; }
-.info-text { padding: 50px 40px 40px; color: #ccc; height: 100%; overflow-y: auto; }
+.info-text { padding: 50px 40px 60px; color: #ccc; height: 100%; overflow-y: auto; box-sizing: border-box; }
 .info-text h3 { color: #ffd700; font-size: 20px; margin-bottom: 24px; text-align: center; }
 .info-text h4 { color: #ddd; font-size: 15px; margin: 18px 0 8px; }
 .info-text p { font-size: 13px; line-height: 1.8; margin: 0 0 12px; color: #aaa; }
@@ -2266,7 +2259,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 /* ===== 顶部控制栏（BGM / 语音 / 聊天，在游戏区域内） ===== */
 .top-controls { position: absolute; top: 28px; right: 100px; z-index: 99999; display: flex; gap: 3px; }
 /* 首页：BGM按钮居中略偏左，不挡"桃"字 */
-.top-controls.menu-only { right: 50%; transform: translateX(calc(50% - 130px)); gap: 0; }
+.top-controls.menu-only { right: 50%; transform: translateX(calc(50% - 90px)); gap: 0; }
 @media screen and (max-width: 1024px) and (orientation: portrait) {
   .top-controls.menu-only { right: 50%; transform: translateX(calc(50% - 160px)); }
 }
