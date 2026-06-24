@@ -210,7 +210,7 @@
                </div>
             </div>
 
-            <div v-for="(tile, index) in gameState.handTiles" :key="getStableTileKey(index, tile)" class="hand-tile-wrapper" :class="{ 'selected': gameState.selectedTileIndex === index, 'new-drawn-tile': isNewDrawnTile(index), 'dragging': dragIndex === index, 'drag-over': dragOverIndex === index }" draggable="true" @click="onTapTile(index)" @dragstart="onDragStart(index, $event)" @dragover.prevent="onDragOver(index)" @dragleave="onDragLeave(index)" @drop="onDrop(index)" @dragend="onDragEnd" @touchstart="onTouchStart(index, $event)" @touchmove.prevent="onTouchMove($event)" @touchend.prevent="onTouchEnd(index)">
+            <div v-for="(tile, index) in gameState.handTiles" :key="getStableTileKey(index, tile)" class="hand-tile-wrapper" :class="{ 'selected': gameState.selectedTileIndex === index, 'new-drawn-tile': isNewDrawnTile(index), 'dragging': dragIndex === index, 'drag-over': dragOverIndex === index }" draggable="true" @click="onTapTile(index)" @dragstart="onDragStart(index, $event)" @dragover.prevent="onDragOver(index)" @dragleave="onDragLeave(index)" @drop="onDrop(index)" @dragend="onDragEnd" @touchstart="onTouchStart(index, $event)" @touchmove.prevent="onTouchMove($event)" @touchend="onTouchEnd(index, $event)">
               <img :src="getImg('3d/hand_1.png')" class="tile-bg" />
               <img :src="getImg(`tiles/${tile}.png`)" class="tile-face" />
             </div>
@@ -289,6 +289,22 @@
           </div>
         </div>
 
+        <!-- 头像选择器 -->
+        <div class="avatar-picker-overlay" v-if="showAvatarPicker" @click.self="showAvatarPicker = false">
+          <div class="avatar-picker-panel">
+            <h3>选择头像</h3>
+            <div class="avatar-grid">
+              <img v-for="n in 12" :key="'av'+n" :src="getImg(`avatars/${n}.表情包.png`)" class="avatar-option" @click="selectPresetAvatar(n)" />
+            </div>
+            <div class="avatar-picker-actions">
+              <button class="avatar-action-btn" @click="takePhoto">📷 拍照</button>
+              <button class="avatar-action-btn" @click="avatarFileInput?.click()">📁 选择图片</button>
+              <button class="avatar-action-btn cancel" @click="showAvatarPicker = false">取消</button>
+            </div>
+            <input ref="avatarFileInput" type="file" accept="image/*" style="display:none" @change="loadCustomAvatar" />
+          </div>
+        </div>
+
         <!-- 表情选择器 -->
         <div class="emoji-picker" v-if="emojiPicker.target !== null" v-show="gameState.gamePhase === 'PLAYING'">
           <span v-for="e in emojis" :key="e.icon" class="emoji-option" @click="sendEmoji(e.icon)">{{ e.icon }}</span>
@@ -307,11 +323,11 @@
               吃{{ getChiLabel(combo) }}
             </div>
           </template>
-          <div v-else class="action-btn chi" :class="{ 'active': actionState.canChi }" @click="handleChi">吃</div>
-          <div class="action-btn peng" :class="{ 'active': actionState.canPeng }" @click="handlePeng">碰</div>
-          <div class="action-btn gang" :class="{ 'active': actionState.canGang }" @click="handleGang">杠</div>
-          <div class="action-btn hu" :class="{ 'active': actionState.canHu || (gameState.currentPlayerIndex === 0 && gameState.handTiles.length % 3 === 2) }" @click="handleHu">胡</div>
-          <div class="action-btn pass active" v-if="actionState.isWaiting" @click="passAction">过</div>
+          <button v-else class="action-btn chi" :class="{ 'active': actionState.canChi }" @click="handleChi">吃</button>
+          <button class="action-btn peng" :class="{ 'active': actionState.canPeng }" @click="handlePeng">碰</button>
+          <button class="action-btn gang" :class="{ 'active': actionState.canGang }" @click="handleGang">杠</button>
+          <button class="action-btn hu" :class="{ 'active': actionState.canHu || (gameState.currentPlayerIndex === 0 && gameState.handTiles.length % 3 === 2) }" @click="handleHu">胡</button>
+          <button class="action-btn pass active" v-if="actionState.isWaiting" @click="passAction">过</button>
         </div>
 
       </div>
@@ -576,13 +592,53 @@ const flyingEmojis = ref([]);
 let emojiId = 0;
 
 const openEmojiPicker = (playerIndex) => {
-  // 观战模式：点击头像切换视角
   if (gameMode.value === 'spectate') {
     switchSpectateView(playerIndex);
     return;
   }
-  // 再点同一个头像 → 关闭
+  // 点击自己的头像 → 打开头像选择器
+  if (playerIndex === 0) {
+    showAvatarPicker.value = !showAvatarPicker.value;
+    emojiPicker.target = null;
+    return;
+  }
+  // 点击其他玩家 → 表情包
   emojiPicker.target = emojiPicker.target === playerIndex ? null : playerIndex;
+};
+
+// === 头像选择器 ===
+const showAvatarPicker = ref(false);
+const avatarFileInput = ref(null);
+const loadCustomAvatar = (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    gameState.players[0].avatar = reader.result; // base64 data URL
+    localStorage.setItem('tjmj_avatar', reader.result);
+    showAvatarPicker.value = false;
+  };
+  reader.readAsDataURL(file);
+};
+const selectPresetAvatar = (num) => {
+  const key = `${num}.表情包`;
+  gameState.players[0].avatar = key;
+  localStorage.setItem('tjmj_avatar', key);
+  showAvatarPicker.value = false;
+};
+// 初始化时从 localStorage 恢复头像
+const restoreAvatar = () => {
+  const saved = localStorage.getItem('tjmj_avatar');
+  if (saved) gameState.players[0].avatar = saved;
+};
+// 拍照（调用相机）
+const takePhoto = () => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.capture = 'environment'; // 后置摄像头
+  input.onchange = loadCustomAvatar;
+  input.click();
 };
 
 const sendEmoji = (icon) => {
@@ -864,7 +920,6 @@ const rtcConfig = {
 // 启动音量监测
 const startMicLevelMonitor = async (stream) => {
   try {
-    await _ensureAudioCtx();
     if (!_micCtx) _micCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (_micCtx.state === 'suspended') _micCtx.resume();
     analyserNode = _micCtx.createAnalyser();
@@ -896,6 +951,10 @@ const toggleMic = async () => {
     stopMicLevelMonitor();
   } else {
     try {
+      if (!navigator?.mediaDevices?.getUserMedia) {
+        alert('当前环境不支持麦克风（需 HTTPS 或 localhost）');
+        return;
+      }
       if (!localStream.value) {
         localStream.value = await navigator.mediaDevices.getUserMedia({
           audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
@@ -911,6 +970,7 @@ const toggleMic = async () => {
       }
     } catch (e) {
       console.log('麦克风权限被拒绝:', e);
+      alert('无法开启麦克风，请检查浏览器权限设置');
     }
   }
 };
@@ -1052,6 +1112,7 @@ const closeInfo = () => {
 };
 onMounted(async () => {
   updateGameScale();
+  restoreAvatar();
   // BGM 默认关闭，需手动点击按钮开启
   const params = new URLSearchParams(location.search);
   const autoJoin = params.get('auto_join');
@@ -1596,9 +1657,10 @@ const onTouchMove = (e) => {
     if (gameState.selectedTileIndex === dragIndex.value) gameState.selectedTileIndex = target;
   }
 };
-const onTouchEnd = (index) => {
-  // 轻点=选中（弹起），再点=打出（和电脑端双击逻辑一致）
-  if (!touchMoved && Date.now() - touchStartTime < 300) {
+const onTouchEnd = (index, e) => {
+  e.preventDefault(); // 阻止 iOS 双击缩放
+  // 轻点=选中，再点=打出（扩大阈值到 500ms 防止慢触失效）
+  if (!touchMoved && Date.now() - touchStartTime < 500) {
     onTapTile(index);
   }
   dragIndex.value = -1;
@@ -2042,7 +2104,7 @@ const nextTurn = () => {
 
 <style scoped>
 /* 基础容器 */
-.app-container { display: flex; justify-content: center; align-items: center; width: 100vw; height: 100vh; background-color: #000; overflow: hidden; user-select: none; -webkit-user-select: none; }
+.app-container { display: flex; justify-content: center; align-items: center; width: 100vw; height: 100vh; height: 100dvh; background-color: #000; overflow: hidden; user-select: none; -webkit-user-select: none; }
 body { overflow: hidden; margin: 0; }
 .mahjong-desk * { cursor: default; }
 input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; }
@@ -2133,8 +2195,8 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .icon-btn svg { width: 14px; height: 14px; }
 
 /* 内容弹窗（竖屏，右上X关闭） */
-.info-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.92); z-index: 999999; display: flex; align-items: center; justify-content: center; }
-.info-panel { position: relative; width: 100vw; height: 100vh; max-width: none; background: #1a1a2e; border-radius: 0; overflow: hidden; }
+.info-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; height: 100dvh; background: rgba(0,0,0,0.92); z-index: 999999; display: flex; align-items: center; justify-content: center; }
+.info-panel { position: relative; width: 100vw; height: 100vh; height: 100dvh; max-width: none; background: #1a1a2e; border-radius: 0; overflow: hidden; }
 .info-close { position: absolute; top: 16px; right: 20px; z-index: 999; background: rgba(0,0,0,0.7); border: 2px solid rgba(255,255,255,0.4); color: white; font-size: 24px; width: 42px; height: 42px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; line-height: 1; }
 .info-close:hover { background: #e81123; border-color: #e81123; }
 .info-iframe { width: 100%; height: 100%; border: none; }
@@ -2154,7 +2216,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 
 /* 手机端弹窗适配 */
 @media screen and (max-width: 1024px) {
-  .info-panel { width: 100vw; height: 100vh; }
+  .info-panel { width: 100vw; height: 100vh; height: 100dvh; }
   .info-text { padding: 60px 20px 60px; }
   .info-close { top: 20px; right: 16px; width: 44px; height: 44px; font-size: 26px; }
 }
@@ -2311,9 +2373,22 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .avatar-img.clickable { cursor: pointer; }
 .avatar-img.clickable:hover { transform: scale(1.15); filter: brightness(1.2); transition: 0.2s; }
 
+/* 头像选择器 */
+.avatar-picker-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; height: 100dvh; background: rgba(0,0,0,0.85); z-index: 9999999; display: flex; align-items: center; justify-content: center; }
+.avatar-picker-panel { background: #1a1a2e; border: 2px solid #ffd700; border-radius: 12px; padding: 20px; text-align: center; max-width: 360px; width: 90vw; }
+.avatar-picker-panel h3 { color: #ffd700; margin: 0 0 14px; font-size: 16px; }
+.avatar-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
+.avatar-option { width: 100%; aspect-ratio: 1; border-radius: 10px; border: 2px solid #444; cursor: pointer; background: #fff; object-fit: cover; transition: 0.15s; }
+.avatar-option:hover { border-color: #ffd700; transform: scale(1.08); }
+.avatar-picker-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.avatar-action-btn { background: rgba(255,255,255,0.1); border: 1px solid #555; border-radius: 8px; color: #ddd; padding: 6px 14px; font-size: 13px; cursor: pointer; transition: 0.15s; }
+.avatar-action-btn:hover { background: #ffd700; color: #1a1a2e; border-color: #ffd700; }
+.avatar-action-btn.cancel { border-color: #666; color: #888; }
+.avatar-action-btn.cancel:hover { background: #444; color: #ccc; border-color: #888; }
+
 /* 动作按钮 */
 .action-buttons { position: absolute; bottom: 85px; right: 10%; display: flex; gap: 5px; z-index: 100; }
-.action-btn { width: 44px; height: 44px; border-radius: 50%; background: #555; border: 2px solid #333; color: #aaa; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 16px; transition: 0.3s; }
+.action-btn { width: 44px; height: 44px; border-radius: 50%; background: #555; border: 2px solid #333; color: #aaa; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 16px; transition: 0.3s; cursor: pointer; -webkit-appearance: none; padding: 0; outline: none; }
 .action-btn.active { background: linear-gradient(145deg, #ffcc00, #ff9900); border-color: #fff; color: #fff; cursor: pointer; box-shadow: 0 4px 10px rgba(255,215,0,0.5); }
 .action-btn.active:active { transform: scale(0.9); }
 .action-btn.pass.active { background: linear-gradient(145deg, #66bb6a, #43a047); } 
