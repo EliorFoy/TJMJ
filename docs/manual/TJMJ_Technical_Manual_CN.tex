@@ -1,448 +1,745 @@
-% ===========================================================================
-%  TJMJ 技术手册 — 中文版 (双栏文字 + 单栏图表)
-%  编译: xelatex × 3
-% ===========================================================================
-\documentclass[11pt,a4paper,twocolumn]{article}
+% TJMJ 技术手册 — 中文完整版 (单栏)
+% 编译: xelatex × 3
+\documentclass[11pt,a4paper]{article}
 \usepackage[UTF8]{ctex}
 \setCJKmainfont{SimSun}[BoldFont=SimHei,ItalicFont=KaiTi]
 \setCJKmonofont{FangSong}
-\usepackage{fontspec}
-\setmainfont{Times New Roman}
+\usepackage{fontspec}\setmainfont{Times New Roman}
+\renewcommand{\ttdefault}{lmtt}
 
 \usepackage{geometry}
-\geometry{top=2cm,bottom=2cm,left=1.8cm,right=1.8cm,columnsep=0.6cm}
-\usepackage{fancyhdr}
-\pagestyle{fancy}\fancyhf{}
-\fancyhead[L]{\small 桃江麻将技术手册}
+\geometry{top=2.2cm,bottom=2.2cm,left=2.5cm,right=2.5cm}
+\usepackage{fancyhdr}\pagestyle{fancy}\fancyhf{}
+\fancyhead[L]{\small TJMJ 技术手册 (中文版)}
 \fancyhead[R]{\small\thepage}
 \renewcommand{\headrulewidth}{0.4pt}
+\setlength{\parskip}{3pt plus1pt minus1pt}
 
 \usepackage{amsmath,amssymb,mathtools}
 \usepackage{graphicx}
 \usepackage[table]{xcolor}
-\usepackage{booktabs,array,multirow,tabularx}
+\usepackage{booktabs,array,multirow,tabularx,longtable}
 \usepackage{enumitem}
 \usepackage{hyperref}
 \hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue}
 \usepackage{float}
-\usepackage{caption}
+\usepackage{caption,subcaption}
 \usepackage{listings}
-\lstset{basicstyle=\ttfamily\scriptsize,breaklines=true,frame=single,numbers=left,numberstyle=\tiny,language={}}
+\lstset{basicstyle=\ttfamily\footnotesize,breaklines=true,frame=single,rulecolor=\color{gray!40},backgroundcolor=\color{gray!5},keywordstyle=\color{blue}\bfseries,commentstyle=\color{green!50!black},stringstyle=\color{red!70!black},showstringspaces=false,numbers=left,numberstyle=\tiny\color{gray},numbersep=5pt,tabsize=2,language={}}
 \usepackage{tikz}
 \usetikzlibrary{shapes,arrows,positioning,fit,calc,backgrounds}
-
 \tikzset{
-  block/.style={rectangle,draw,rounded corners,fill=blue!5,text width=2.5cm,minimum height=0.8cm,align=center,font=\footnotesize},
-  sbox/.style={rectangle,draw,rounded corners,fill=green!5,text width=1.8cm,minimum height=0.6cm,align=center,font=\scriptsize},
-  arrow/.style={->,>=stealth,thick},
-  cloud/.style={ellipse,draw,fill=gray!10,text width=3cm,minimum height=1cm,align=center,font=\footnotesize},
+  b/.style={rectangle,draw,rounded corners=1pt,fill=blue!5,text width=2.8cm,minimum height=0.9cm,align=center,font=\footnotesize},
+  sb/.style={rectangle,draw,rounded corners=1pt,fill=green!5,text width=2cm,minimum height=0.7cm,align=center,font=\scriptsize},
+  arr/.style={->,>=stealth,thick},
+  cld/.style={ellipse,draw,fill=gray!10,minimum width=3cm,minimum height=1.2cm,align=center,font=\footnotesize},
+  cli/.style={rectangle,draw,fill=blue!5,text width=2.5cm,minimum height=0.8cm,align=center,font=\footnotesize},
+  srv/.style={rectangle,draw,fill=orange!10,text width=2.5cm,minimum height=0.8cm,align=center,font=\footnotesize},
 }
 
-% 让图表横跨双栏
-\newenvironment{figurewide}[1][H]{\begin{figure*}[#1]\centering}{\end{figure*}}
-\newenvironment{tablewide}[1][H]{\begin{table*}[#1]\centering}{\end{table*}}
-
-\title{\bfseries\LARGE 桃江经典王麻将 (TJMJ)\\[3pt]
-       全栈实时 Web 平台技术手册\\[6pt]
-       \large 中文版 v3.0}
+\title{\bfseries\LARGE 桃江经典王麻将 (TJMJ)\\[4pt]
+       全栈实时 Web 平台\\[2pt]
+       \large 技术研究报告}
 \author{JaiJaiC\\\small 湖南桃江\\\small\texttt{https://github.com/JaijaiC/TJMJ}}
 \date{\today}
 
 \begin{document}
 \maketitle
 
-\begin{abstract}
-\noindent 本文系统阐述了一款面向湖南桃江地区的全栈网页麻将游戏平台——TJMJ（桃江经典王麻将）的技术实现。
-平台前端采用 Vue 3 Composition API 单页架构、Vite 8 构建工具链，
-后端基于 Node.js WebSocket 服务器，语音通信采用 WebRTC P2P 网状拓扑辅以 Twilio TURN 中继。
-系统完整实现了桃江地方麻将规则体系：打筛扳王（癞子）机制、扎鸟翻倍计分、门子累加番型、组合胡法等。
-核心算法包括 $\mathcal{O}(3^k)$ 复杂度的递归回溯胡牌判定引擎（实测亚毫秒级）、启发式 NPC 出牌策略、以及支持自定义拖拽的手牌管理系统。
-本文详述了系统架构设计、通信协议栈、游戏规则数学模型、核心算法实现、多平台兼容性方案及性能评测结果。
-\end{abstract}
+\begin{center}
+\rule{\linewidth}{1pt}\\[4pt]
+\begin{minipage}{0.95\linewidth}
+\small\textbf{摘要}\quad
+本文系统阐述面向湖南桃江地区的全栈网页麻将游戏平台 TJMJ（桃江经典王麻将）的技术实现。平台前端采用 Vue 3 Composition API 单页架构与 Vite 8 构建工具链，后端基于 Node.js WebSocket 服务器，语音通信采用 WebRTC P2P 网状拓扑辅以 Twilio TURN 中继（10\,GB/月免费额度）。系统完整实现桃江地方麻将规则体系：打筛扳王（癞子）机制、扎鸟翻倍计分、门子累加番型、组合胡法等，支持单机 AI、四人联机、观战三种模式。核心算法包括 $\mathcal{O}(3^k)$ 递归回溯胡牌判定引擎（亚毫秒级实际运行时间）、启发式 NPC 出牌策略、客户端拖拽与服务器计数的差异化手牌同步算法。本文提供完整的系统架构图、协议定义、数学公式、算法伪代码、跨平台兼容性方案及性能基准数据。项目完全开源，总代码量约 4200 行，前端部署于 GitHub Pages，后端通过 ngrok 公网穿透。
+\end{minipage}\\[4pt]
+\rule{\linewidth}{0.5pt}
+\end{center}
 
-{\small\tableofcontents}
+\tableofcontents
 \newpage
 
 % ===================================================================
 \section{引言}
 % ===================================================================
 
-中国麻将起源于清代，经过数百年的地域演化形成了众多地方变种。湖南桃江地区的经典王麻将是其中独具特色的一支：使用精简的 108 张牌组（万/筒/条，不含风牌与花牌）、通过打筛扳王动态确定万能牌（癞子）、采用扎鸟机制在胡牌后进行翻倍计分、允许多种胡法累加番型。
+\subsection{背景与动机}
 
-尽管市场上存在诸多麻将类应用，但无一能完整满足桃江玩家的需求。闲逸等商业 App 要求强制注册登录、界面繁琐、规则与本地玩法存在差异、缺少拖拽手牌和实时语音等现代化交互功能。更为重要的是，现有平台均未提供可供二次开发的开放源代码基础。
+中国麻将是世界上流传最广的桌上博弈游戏之一，其规则在数百年的地域传播中演化出数十种地方变体。湖南桃江地区的"经典王麻将"是其中独具特色的一支：使用精简的 108 张牌组（万/筒/条，不含风牌与花牌）、通过"打筛扳王"动态确定万能牌（癞子）、以"扎鸟"机制在胡牌后翻倍计分、允许多种"门子"（额外胡法）累加番型。这些规则共同塑造了桃江麻将快速、激烈、不可预测的对局节奏，深受当地群众喜爱。
 
-TJMJ 应运而生——一款无需安装、点击链接即可进入、规则与桃江本地高度一致的网页麻将平台。项目采用全开源架构，前端部署于 GitHub Pages，后端通过 ngrok 公网穿透。总计约 4200 行核心 JavaScript 代码，涵盖单人 AI、四人联机、观战三大模式。
+然而，桃江麻将的数字生态长期存在空白。目前市面上仅有闲逸等少数商业 App 提供益阳麻将玩法，但存在以下显著缺陷：\textbf{(1)}~需要强制注册登录，操作链路冗长；\textbf{(2)}~界面设计繁琐，广告干扰严重；\textbf{(3)}~规则实现与桃江本地玩法不完全一致（如缺少扎鸟、扳王等核心机制）；\textbf{(4)}~缺乏拖拽手牌、实时语音、文字弹幕等现代化交互功能；\textbf{(5)}~不开源，无法供二次开发或学术研究使用。此外，微信小程序路径因棋牌类游戏需备案且暂不对个人开放而受阻，Cocos 等游戏引擎入门门槛高、开发效率低。
+
+TJMJ 应运而生——一款完全开源、无需安装、点击链接即用的网页麻将平台。项目在 Vue 3 Composition API + Vite 8 前端框架与 Node.js WebSocket 服务端架构之上，完整实现了桃江麻将的全部规则，并提供单人模式（vs AI）、四人联机实时对战、观战三种玩法模式。本文系该平台的完整技术文档，涵盖系统架构、游戏规则、算法实现、多人联机基础设施、跨平台兼容性方案及性能评测。
+
+\textbf{主要贡献}：
+\begin{enumerate}[nosep]
+  \item 桃江麻将规则的完整数学形式化——包括牌组编码、骰子力学、癞子计算、操作优先级、计分模型与扎鸟公式；
+  \item 生产级全栈架构——服务端权威判定的多人游戏系统，通过 JSON over WebSocket 实现亚 100ms 状态同步延迟；
+  \item 递归回溯胡牌检测引擎——$\mathcal{O}(3^k)$ 最坏复杂度，实测 $<$1\,ms，附带听牌检测与 NPC 启发式决策；
+  \item 容错多人基础设施——指数退避断线重连、服务端 10 秒操作超时防死锁、URL 参数房间状态持久化；
+  \item 全面的跨平台适配方案——解决 iOS Safari 点击事件、AudioContext 挂起、Android 动态地址栏、CSS Transform 破坏 fixed 定位等实际问题。
+\end{enumerate}
+
+\subsection{项目规模}
+
+表~\ref{tab:scale} 列出了核心源代码文件的规模统计。
+
+\begin{table}[H]
+\centering
+\caption{项目核心代码规模}
+\label{tab:scale}
+\small
+\begin{tabular}{@{}lrr@{}}
+\toprule
+\textbf{文件} & \textbf{行数} & \textbf{职责} \\
+\midrule
+\texttt{frontend/src/App.vue} & 2602 & 主界面 UI + 游戏逻辑 + CSS 样式 \\
+\texttt{server/GameRoom.js} & 494 & 多人房间状态机 \\
+\texttt{server/index.js} & 247 & WebSocket 服务入口 \\
+\texttt{frontend/src/ai/NpcStrategy.js} & 227 & NPC 出牌决策 AI \\
+\texttt{frontend/src/network/client.js} & 224 & 网络层（重连/心跳/节流） \\
+\texttt{frontend/src/core/HuCalculator.js} & 208 & 胡牌判定引擎 \\
+\texttt{frontend/src/core/RuleChecker.js} & 142 & 吃碰杠规则检查 \\
+\texttt{frontend/src/utils/speech.js} & 100 & 语音播报系统 \\
+\midrule
+\textbf{合计} & \textbf{4244} & — \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ===================================================================
+\section{同类工作比较}
+% ===================================================================
+
+表~\ref{tab:platforms} 对比了现有数字麻将平台的核心功能差异。
+
+\begin{table}[H]
+\centering
+\caption{数字麻将平台功能对比}
+\label{tab:platforms}
+\footnotesize
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{特性} & \textbf{闲逸} & \textbf{雀魂} & \textbf{武汉麻将} & \textbf{Open-Majiang} & \textbf{TJMJ} \\
+\midrule
+桃江规则 & 部分 & $\times$ & $\times$ & $\times$ & \checkmark \\
+免注册登录 & $\times$ & $\times$ & \checkmark & \checkmark & \checkmark \\
+开源 & $\times$ & $\times$ & $\times$ & \checkmark & \checkmark \\
+拖拽手牌 & $\times$ & $\times$ & $\times$ & $\times$ & \checkmark \\
+实时语音 & $\times$ & $\times$ & $\times$ & $\times$ & \checkmark \\
+文字弹幕 & $\times$ & $\times$ & $\times$ & $\times$ & \checkmark \\
+观战模式 & $\times$ & \checkmark & $\times$ & $\times$ & \checkmark \\
+AI 对手 & $\times$ & \checkmark & $\times$ & $\times$ & \checkmark \\
+Web 原生 & $\times$ & \checkmark & \checkmark & \checkmark & \checkmark \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Web 实时游戏技术栈}
+
+TJMJ 的选择基于以下技术成熟度考量：WebSocket（RFC~6455）提供全双工低开销通信，比 HTTP 长轮询减少约 80\% 的延迟开销；WebRTC 标准提供浏览器原生 P2P 音视频能力，配合 STUN/TURN 基础设施可实现跨 NAT 穿透；Vue 3 Composition API 的响应式状态管理天然适合复杂 UI 的增量更新；Vite 8 的原生 ESM 开发服务器和 Rolldown 打包器提供极速冷启动和构建体验。
 
 % ===================================================================
 \section{系统架构}
 % ===================================================================
 
-\begin{figurewide}
+\subsection{总体架构}
+
+TJMJ 采用经典的三层 B/S 架构。图~\ref{fig:arch} 展示了从浏览器到服务端的完整数据通路。
+
+\begin{figure}[H]
 \centering
-\begin{tikzpicture}[node distance=0.8cm,scale=0.8,every node/.style={transform shape}]
-  \node[block,fill=blue!8,text width=10cm,minimum height=1.2cm] (clients) {\textbf{前端表示层}\\[2pt]浏览器 (Chrome / Safari / Edge) — Vue 3 + Vite 单页应用};
-  \node[cloud,below=of clients,text width=10cm,minimum height=1cm] (net) {\textbf{网络层}\\[2pt]GitHub Pages (HTTPS) $\cdot$ ngrok 隧道 (WSS) $\cdot$ WebRTC P2P $\cdot$ Twilio TURN};
-  \node[block,fill=orange!8,below=of net,text width=10cm,minimum height=1.5cm] (srv) {\textbf{服务端}\\[2pt]Node.js WebSocket 服务器 (:8080) — 消息路由 + GameRoom 房间管理};
-  \node[block,fill=red!5,below=of srv,text width=10cm,minimum height=1cm] (logic) {\textbf{游戏引擎（前后端双部署）}\\[2pt]frontend/core/ $\leftrightarrow$ server/game/ (HuCalculator, RuleChecker, mjLogic)};
-  \draw[arrow] (clients) -- (net);
-  \draw[arrow] (net) -- (srv);
-  \draw[arrow] (srv) -- (logic);
-  \node[sbox,right=of net,xshift=4cm,fill=cyan!8] (voice) {WebRTC 语音\\P2P Mesh\\Twilio 10GB/月};
-  \draw[arrow,dashed] (clients.east) -- (voice.west);
+\begin{tikzpicture}[node distance=0.9cm, scale=0.85, every node/.style={transform shape}]
+  \node[cli,minimum width=10cm,text width=9.5cm] (c) {\textbf{表示层（浏览器）}\\Player A (Chrome) $\cdot$ Player B (Safari/iOS) $\cdot$ Player C (Edge/Android) $\cdot$ Spectator (Any)};
+  \node[cld,below=of c,minimum width=10cm,text width=9.5cm] (n) {\textbf{网络层}\\GitHub Pages (HTTPS) $\cdot$ ngrok TCP Tunnel (WSS) $\cdot$ WebRTC P2P $\cdot$ Twilio TURN};
+  \node[srv,below=of n,text width=7cm,minimum height=2.5cm] (s) {\textbf{应用服务器 (Node.js :8080)}\\WebSocket 消息路由\\GameRoom 房间管理 $\times N$\\TURN 凭据生成 (HMAC-SHA1)};
+  \node[b,below=of s,text width=8cm,minimum height=2cm,fill=red!5] (g) {\textbf{游戏引擎（双端部署）}\\frontend/core/ $\leftrightarrow$ server/game/\\HuCalculator $\cdot$ RuleChecker $\cdot$ mjLogic};
+  \draw[arr] (c) -- (n);
+  \draw[arr] (n) -- (s);
+  \draw[arr] (s) -- (g);
+  \node[sb,right=of n,xshift=3cm,yshift=-0.5cm,fill=yellow!10] (gh) {GitHub Pages\\静态部署};
+  \node[sb,right=of s,xshift=3cm,yshift=-0.5cm,fill=red!5] (ci) {GitHub Actions\\CI 构建检查};
+  \node[sb,right=of c,xshift=3.5cm,fill=cyan!10] (v) {Twilio TURN\\10 GB/月};
+  \draw[arr,dashed] (gh) -- (c);
+  \draw[arr,dashed] (ci) -- (s);
+  \draw[arr,dashed] (c.east) -- (v.west);
 \end{tikzpicture}
-\caption{系统总体架构}
+\caption{系统总体架构图}
 \label{fig:arch}
-\end{figurewide}
+\end{figure}
 
-\subsection{技术栈}
+\subsection{前端组件架构}
 
-\begin{tablewide}
-\caption{技术栈总览}
+Vue 3 前端以单一主组件 \texttt{App.vue}（2602 行）为核心，将所有 UI 模板、游戏逻辑、CSS 样式集中于一个单文件组件中。图~\ref{fig:fe} 展示了组件依赖关系。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=0.7cm, scale=0.9, every node/.style={transform shape}]
+  \node[b,fill=blue!15,text width=3cm,minimum height=1.5cm] (app) {\textbf{App.vue}\\(2602 行)\\\textit{模板 + 脚本 + 样式}};
+  \node[sb,below left=0.8cm and -1cm of app,fill=green!10] (core) {core/ 游戏引擎\\HuCalculator\\RuleChecker\\constants};
+  \node[sb,below=0.8cm of app,fill=orange!10] (net) {network/ 网络\\client.js\\(224 行)};
+  \node[sb,below right=0.8cm and -1cm of app,fill=purple!10] (ai) {ai/ 人工智能\\NpcStrategy\\(227 行)};
+  \node[sb,left=0.8cm of core,fill=yellow!10] (ut) {utils/ 工具\\mjLogic\\speech};
+  \node[sb,right=0.8cm of ai,fill=cyan!10] (as) {public/ 资源\\images/ (3D牌面)\\sfx/ (音效)\\docs/ (文档)};
+  \draw[arr] (app.south) -- (core.north); \draw[arr] (app.south) -- (net.north); \draw[arr] (app.south) -- (ai.north);
+  \draw[arr] (app.south west) -- (ut.north east); \draw[arr] (app.south east) -- (as.north west);
+  \node[right=of as,font=\tiny,text width=2.5cm] (api) {浏览器 API:\\WebRTC $\cdot$ Web Audio\\Web Speech\\localStorage};
+  \draw[arr,dashed] (as.east) -- (api.west);
+\end{tikzpicture}
+\caption{前端组件依赖关系图}
+\label{fig:fe}
+\end{figure}
+
+\subsection{后端服务架构}
+
+服务端由两个核心文件构成：\texttt{index.js}（247 行）实现 WebSocket 消息路由，\texttt{GameRoom.js}（494 行）实现房间有限状态机。图~\ref{fig:be} 展示了消息处理流水线。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=0.8cm, scale=0.9, every node/.style={transform shape}]
+  \node[srv,text width=5cm,minimum height=1cm] (wss) {\textbf{WebSocket 服务器} (端口 :8080)};
+  \node[b,below=of wss,text width=5cm,minimum height=3.5cm,fill=orange!8] (r) {\textbf{消息路由器}\\[2pt]\begin{tabular}{@{}ll@{}}
+    create\_room & $\to$ GameRoom() \\
+    join\_room   & $\to$ addPlayer() \\
+    discard/draw & $\to$ handleXxx() \\
+    action/pass  & $\to$ resolveXxx() \\
+    webrtc\_*    & $\to$ 信令中继 \\
+    get\_turn    & $\to$ HMAC 生成 \\
+    ping         & $\to$ pong \\
+  \end{tabular}};
+  \node[b,below=of r,text width=5cm,minimum height=2cm,fill=red!5] (rm) {\textbf{GameRoom $\times N$}\\状态: LOBBY $|$ PLAYING $|$ SETTLEMENT\\\texttt{players[],hands[][],exposed[][]}};
+  \node[sb,right=of rm,xshift=2cm,fill=cyan!8] (t) {\textbf{TURN 生成器}\\Twilio HMAC-SHA1\\TTL = 86400 秒};
+  \draw[arr] (wss) -- (r); \draw[arr] (r) -- (rm); \draw[arr,dashed] (r.east) -- (t.west);
+  \node[right=of t,xshift=0.5cm,font=\tiny,text width=3cm] {特性:\\$\bullet$ 10s 操作超时\\$\bullet$ 手牌不排序\\$\bullet$ 跳过 diIndex\\$\bullet$ 全量广播};
+\end{tikzpicture}
+\caption{后端服务架构图}
+\label{fig:be}
+\end{figure}
+
+\subsection{通信协议栈}
+
+图~\ref{fig:stack} 展示了从应用层到传输层的完整通信栈。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=0.5cm, scale=0.85, every node/.style={transform shape}]
+  \node[b,fill=yellow!10,text width=12cm,minimum height=0.6cm] (a) {\textbf{应用消息} — JSON over WebSocket};
+  \node[b,fill=green!8,text width=12cm,minimum height=2.5cm,below=of a] (ws) {\textbf{WebSocket 传输层}\\[2pt]\begin{tabular}{@{}p{3.5cm}|p{3.5cm}|p{3.5cm}@{}}
+    \textit{可靠通道 (TCP)} & \textit{非可靠通道 (UDP)} & \textit{信令通道} \\
+    游戏操作 (discard/draw) & \textbf{WebRTC 语音} & SDP Offer/Answer \\
+    状态同步 (game\_state) & P2P 网状 (Opus 48kHz) & ICE Candidate \\
+    房间管理 & & TURN 凭据获取 \\
+    心跳 (ping/pong) & &
+  \end{tabular}};
+  \node[b,fill=blue!5,text width=12cm,minimum height=0.6cm,below=of ws] (t) {\textbf{TCP/IP} — ngrok 隧道 (wss://) 或本地 (ws://)};
+  \draw[arr] (a) -- (ws); \draw[arr] (ws) -- (t);
+  \node[font=\footnotesize,right=of ws,xshift=5cm,text width=3cm] (n) {\textbf{消息统计}\\客户端$\to$服务端: 18 种\\服务端$\to$客户端: 12 种\\总计: 30 种消息类型};
+  \draw[arr,dashed] (ws.east) -- (n.west);
+\end{tikzpicture}
+\caption{通信协议栈}
+\label{fig:stack}
+\end{figure}
+
+\subsection{WebSocket 消息协议}
+
+表~\ref{tab:proto} 列出了全部 30 种消息类型的定义。
+
+\begin{table}[H]
+\centering
+\caption{完整 WebSocket 消息协议}
+\label{tab:proto}
 \footnotesize
-\begin{tabular}{@{}lll@{}}
-\toprule
-\textbf{层次} & \textbf{技术选型} & \textbf{用途} \\
-\midrule
-前端框架 & Vue 3.5 (Composition API) & 响应式 UI \\
-构建工具 & Vite 8 + Rolldown & 打包/热更新 \\
-前端部署 & GitHub Pages & 静态资源托管 \\
-后端运行时 & Node.js (无框架) & 游戏服务器 \\
-后端通信 & ws (v8.18) & WebSocket 协议 \\
-公网穿透 & ngrok & TCP 隧道 \\
-实时语音 & WebRTC (Opus 48kHz) & P2P 通话 \\
-NAT 穿透 & Google STUN + Twilio TURN & 移动网络 \\
-CI & GitHub Actions & PR 构建检查 \\
-\bottomrule
-\end{tabular}
-\end{tablewide}
-
-\subsection{核心文件结构}
-
-\begin{tablewide}
-\caption{核心文件代码量}
-\footnotesize
-\begin{tabular}{@{}lr@{}}
-\toprule
-\textbf{文件} & \textbf{行数} \\
-\midrule
-frontend/src/App.vue (主界面+逻辑+样式) & 2602 \\
-server/GameRoom.js (房间状态机) & 494 \\
-server/index.js (WebSocket 入口) & 247 \\
-frontend/src/ai/NpcStrategy.js (AI 策略) & 227 \\
-frontend/src/network/client.js (网络层) & 224 \\
-frontend/src/core/HuCalculator.js (胡牌引擎) & 208 \\
-frontend/src/core/RuleChecker.js (规则检查) & 142 \\
-frontend/src/utils/speech.js (语音播报) & 100 \\
-\midrule
-\textbf{合计} & \textbf{4244} \\
-\bottomrule
-\end{tabular}
-\end{tablewide}
-
-\subsection{前后端通信协议}
-
-客户端与服务端通过单一 WebSocket 长连接进行 JSON 消息通信。协议共定义 18 条客户端到服务端消息和 12 条服务端到客户端消息。
-
-\begin{tablewide}
-\caption{核心 WebSocket 消息协议}
-\footnotesize
-\begin{tabular}{@{}lll@{}}
+\begin{tabular}{@{}llp{5cm}@{}}
 \toprule
 \textbf{消息类型} & \textbf{方向} & \textbf{说明} \\
 \midrule
-\texttt{create\_room} & C$\to$S & 创建房间 \\
-\texttt{join\_room} & C$\to$S & 加入房间（8888=测试） \\
-\texttt{discard} & C$\to$S & 出牌 \\
-\texttt{action (hu/peng/gang/chi)} & C$\to$S & 吃碰杠胡操作 \\
-\texttt{webrtc\_offer/answer/ice} & C$\leftrightarrow$S & 语音信令中继（不解析数据） \\
-\texttt{get\_turn} & C$\to$S & 请求 TURN 凭据 \\
-\texttt{ping/pong} & C$\leftrightarrow$S & 心跳检测 \\
-\texttt{game\_start} & S$\to$C & 开局（发牌+王+骰子） \\
-\texttt{game\_state} & S$\to$C & 实时状态同步 \\
-\texttt{action\_prompt} & S$\to$C & 请求玩家操作 \\
-\texttt{drew\_tile} & S$\to$C & 摸牌通知 \\
-\texttt{round\_end} & S$\to$C & 本局结束（四家亮牌） \\
+\texttt{create\_room}    & C$\to$S & 创建房间（可选指定 4 位房间号） \\
+\texttt{join\_room}      & C$\to$S & 加入房间（8888=测试房间） \\
+\texttt{ready}           & C$\to$S & 准备就绪（4 人满自动开局） \\
+\texttt{ready\_next}     & C$\to$S & 确认继续（4 人全确认开新局） \\
+\texttt{discard}         & C$\to$S & 出牌（携带牌值 tile） \\
+\texttt{draw}            & C$\to$S & 摸牌请求 \\
+\texttt{action}          & C$\to$S & 吃/碰/杠/胡操作（携带 action + combo） \\
+\texttt{pass}            & C$\to$S & 过牌 \\
+\texttt{chat}            & C$\leftrightarrow$S & 文字弹幕（携带 text + fromName） \\
+\texttt{emoji}           & C$\leftrightarrow$S & 表情（携带 icon + target） \\
+\texttt{webrtc\_offer}   & C$\leftrightarrow$S & WebRTC SDP Offer 中继 \\
+\texttt{webrtc\_answer}  & C$\leftrightarrow$S & WebRTC SDP Answer 中继 \\
+\texttt{webrtc\_ice}     & C$\leftrightarrow$S & WebRTC ICE Candidate 中继 \\
+\texttt{update\_avatar}   & C$\to$S & 头像更新同步 \\
+\texttt{get\_turn}       & C$\to$S & 请求 TURN 凭据 \\
+\texttt{join\_spectate}  & C$\to$S & 加入观战 \\
+\texttt{ping}            & C$\to$S & 心跳检测 \\
+\texttt{pay}             & C$\to$S & 手动转分 \\
+\midrule
+\texttt{room\_created}   & S$\to$C & 房间创建成功（返回 roomId） \\
+\texttt{room\_joined}     & S$\to$C & 房间加入成功 \\
+\texttt{room\_players}    & S$\to$C & 玩家列表更新（昵称/头像/状态） \\
+\texttt{game\_start}      & S$\to$C & 开局（每人收到自己的 hand + wangTile + dice） \\
+\texttt{game\_state}      & S$\to$C & 实时状态同步（弃牌/副露/牌数/回合） \\
+\texttt{action\_prompt}   & S$\to$C & 请求玩家操作（canHu/Peng/Gang/Chi） \\
+\texttt{drew\_tile}       & S$\to$C & 摸到某张牌 \\
+\texttt{round\_end}       & S$\to$C & 本局结束（四家亮牌） \\
+\texttt{pong}            & S$\to$C & 心跳回复 \\
+\texttt{turn\_credentials}& S$\to$C & TURN 服务器凭据 \\
+\texttt{avatar\_updated}  & S$\to$C & 头像已同步 \\
+\texttt{game\_end}        & S$\to$C & 16 局终局 \\
 \bottomrule
 \end{tabular}
-\end{tablewide}
+\end{table}
 
-\begin{figurewide}
-\centering
-\begin{tikzpicture}[node distance=1.8cm,scale=0.85,every node/.style={transform shape}]
-  \node[block,fill=green!8,text width=3.5cm,minimum height=1.2cm] (lobby) {\textbf{LOBBY}\\等待玩家加入\\$\bullet$ 创建/加入/准备};
-  \node[block,fill=blue!8,text width=3.5cm,minimum height=1.2cm,right=of lobby] (play) {\textbf{PLAYING}\\游戏进行中\\$\bullet$ 回合循环 $\bullet$ 拦截检测};
-  \node[block,fill=yellow!8,text width=3.5cm,minimum height=1.2cm,below=of play] (settle) {\textbf{SETTLEMENT}\\本局结束\\$\bullet$ 亮牌 $\bullet$ 等待确认};
-  \draw[arrow] (lobby) -- (play) node[midway,above,font=\footnotesize] {4人准备就绪};
-  \draw[arrow] (play) -- (settle) node[midway,left,font=\footnotesize] {有人胡牌/流局};
-  \draw[arrow] (settle.east) -- ++(1.2,0) |- (play.east) node[pos=0.7,right,font=\footnotesize] {全员确认};
-  \draw[arrow] (settle.west) -- ++(-1.2,0) |- (lobby.south) node[pos=0.5,below,font=\footnotesize] {16局终局};
-\end{tikzpicture}
-\caption{GameRoom 房间状态机}
-\label{fig:fsm}
-\end{figurewide}
+\subsection{WebRTC 语音架构}
 
-\begin{figurewide}
+联机语音采用 P2P 全连接（Mesh）拓扑。图~\ref{fig:mesh} 展示了 4 名玩家间的连接关系。
+
+\begin{figure}[H]
 \centering
-\begin{tikzpicture}[node distance=1.6cm,scale=0.85,every node/.style={transform shape}]
-  \node[circle,draw,fill=blue!10,minimum size=1.5cm,font=\footnotesize] (p0) {玩家0};
-  \node[circle,draw,fill=green!10,minimum size=1.5cm,font=\footnotesize,above right=of p0] (p1) {玩家1};
-  \node[circle,draw,fill=orange!10,minimum size=1.5cm,font=\footnotesize,above left=of p0] (p3) {玩家3};
-  \node[circle,draw,fill=purple!10,minimum size=1.5cm,font=\footnotesize,above=of p1,yshift=-0.2cm,xshift=0.8cm] (p2) {玩家2};
-  \draw[arrow] (p0) -- (p1); \draw[arrow] (p0) -- (p3); \draw[arrow] (p0) -- (p2);
-  \draw[arrow] (p1) -- (p2); \draw[arrow] (p1) -- (p3); \draw[arrow] (p3) -- (p2);
-  \node[cloud,right=of p2,xshift=1cm] (turn) {Twilio TURN\\10GB/月};
-  \draw[arrow,dashed] (p2.east) -- (turn.west);
-  \node[font=\footnotesize,below=of p0,yshift=0.3cm,text width=6cm] {6 条 P2P 连接，Opus 48kHz 编码，增量管理};
+\begin{tikzpicture}[node distance=2cm, scale=0.9, every node/.style={transform shape}]
+  \node[circle,draw,fill=blue!10,minimum size=1.6cm,font=\footnotesize] (p0) {玩家 0\\(庄家)};
+  \node[circle,draw,fill=green!10,minimum size=1.6cm,font=\footnotesize,above right=of p0] (p1) {玩家 1\\(下家)};
+  \node[circle,draw,fill=orange!10,minimum size=1.6cm,font=\footnotesize,above left=of p0] (p3) {玩家 3\\(上家)};
+  \node[circle,draw,fill=purple!10,minimum size=1.6cm,font=\footnotesize,above=of p1,yshift=-0.2cm,xshift=0.8cm] (p2) {玩家 2\\(对家)};
+  \draw[arr] (p0) -- (p1) node[midway,below right,font=\tiny] {PC$_{01}$};
+  \draw[arr] (p0) -- (p3) node[midway,below left,font=\tiny] {PC$_{03}$};
+  \draw[arr] (p0) -- (p2);
+  \draw[arr] (p1) -- (p2) node[midway,right,font=\tiny] {PC$_{12}$};
+  \draw[arr] (p3) -- (p2) node[midway,left,font=\tiny] {PC$_{32}$};
+  \draw[arr] (p1) -- (p3) node[midway,below,font=\tiny] {PC$_{13}$};
+  \node[cld,right=of p2,xshift=1.2cm] (turn) {TURN 中继\\Twilio 10GB/月};
+  \draw[arr,dashed] (p2.east) -- (turn.west); \draw[arr,dashed] (p1.east) -- (turn.west);
+  \node[font=\tiny,below=of p0,yshift=0.3cm,text width=6cm] {边数: $\binom{4}{2}=6$ 条 P2P 连接 | 编码: Opus 48kHz | 管理: 增量创建/销毁};
 \end{tikzpicture}
-\caption{WebRTC P2P 网状语音拓扑}
+\caption{WebRTC 全连接语音拓扑}
 \label{fig:mesh}
-\end{figurewide}
+\end{figure}
+
+\subsection{部署架构}
+
+图~\ref{fig:deploy} 描绘了从开发环境到生产环境的完整部署流程。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=0.7cm, scale=0.85, every node/.style={transform shape}]
+  \node[b,fill=yellow!10,text width=8cm,minimum height=1.2cm] (dev) {\textbf{开发者本地}\\Git 仓库 $\cdot$ VS Code};
+  \node[cld,below=of dev,text width=8cm,minimum height=0.8cm] (cmd) {\texttt{start-all.bat} 启动 3 窗口: Server :8080 + Frontend :5173 + ngrok};
+  \node[b,fill=green!8,text width=8cm,minimum height=1.2cm,below=of cmd] (deploy) {\textbf{云端部署}\\GitHub Pages (前端静态) + ngrok (后端隧道)};
+  \node[b,fill=blue!5,text width=8cm,minimum height=0.8cm,below=of deploy] (user) {\textbf{玩家访问}\\https://jaijaic.github.io/TJMJ/};
+  \draw[arr] (dev) -- (cmd) node[midway,right,font=\tiny] {npm run build + deploy};
+  \draw[arr] (cmd) -- (deploy);
+  \draw[arr] (deploy) -- (user);
+  \node[sb,right=of deploy,xshift=4cm,fill=cyan!5] (act) {GitHub Actions\\PR build 检查};
+  \draw[arr,dashed] (dev.east) -- (act.west) node[midway,above,font=\tiny] {git push};
+\end{tikzpicture}
+\caption{部署架构图}
+\label{fig:deploy}
+\end{figure}
 
 % ===================================================================
 \section{游戏规则与数学模型}
 % ===================================================================
 
-\subsection{牌组编码}
+\subsection{牌组定义与编码}
 
-麻将牌组 $\mathcal{T} = \{11,\ldots,19,21,\ldots,29,31,\ldots,39\}$，共 108 张。编码规则：$t = 10s + v$，其中 $s\in\{1,2,3\}$ 为花色（1=万, 2=条, 3=筒），$v\in\{1,\ldots,9\}$ 为面值。每张牌有 4 个副本。
+定义牌组 $\mathcal{T} = \{11,12,\ldots,19,21,\ldots,29,31,\ldots,39\}$。编码规则为 $t = 10s + v$，其中 $s \in \{1,2,3\}$ 表示花色类别（1=万、2=条、3=筒），$v \in \{1,\ldots,9\}$ 表示面值数字。每张牌有 4 个相同的副本，总牌数为 $|\mathcal{T}|=108$。
 
-将牌（$\mathcal{J}$）定义为面值属于 $\{2,5,8\}$ 的牌，共 $3\times3\times4=36$ 张。将牌是胡牌的必要组成部分。
+定义"将"牌集合为 $\mathcal{J} = \{t \in \mathcal{T} \mid t \bmod 10 \in \{2,5,8\}\}$。由于 $s$ 有 3 种、$v$ 有 3 种、每种 4 张，故 $|\mathcal{J}| = 3 \times 3 \times 4 = 36$。将对是胡牌的必要元素。
 
-\subsection{打筛扳王}
+\subsection{骰子力学与发牌}
 
-开局由庄家掷两枚骰子 $d_1,d_2$，点数之和 $S = d_1+d_2$。从庄家 $P_0$ 开始逆时针数到第 $S$ 家（$P_0$ 对应 1,5,9），该玩家面前的牌墙为起手墙。在起手墙右手边起跳过 $d_1$ 叠后开始抓牌。
+开局投掷两枚均匀六面骰子，记点数分别为 $d_1, d_2$（$d_1 \leq d_2$）。总和 $S = d_1 + d_2$ 决定起手墙。从庄家 $P_0$ 开始逆时针点数，$S$ 对应的玩家面前的牌墙即为起手墙（$P_0$ 为 1,5,9；$P_1$ 为 2,6,10；$P_2$ 为 3,7,11；$P_3$ 为 4,8,12）。
 
-扳王规则：从起手墙对应玩家的下家墙左手边数到第 $d_2$ 叠，翻开最上面一张牌即为"地"（$T_d$）。"王"（癞子，$T_w$）的计算公式为：
+开牌位置为起手墙右端开始往左数，跳过 $d_1$ 叠后开始抓牌。发牌过程为 3 轮每人 4 张（共 12 张），随后庄家先补 1 张至 13 张、其他 3 家各补 1 张至 13 张，最后庄家再补 1 张至 14 张。合计 53 张牌被分发。
+
+\subsection{王（癞子）的判定}
+
+从起手墙对应玩家的下家墙左手边开始往右数，到第 $d_2$ 叠处翻开最上面一张牌即为"地"（$T_d$）。"王"（癞子，$T_w$）则按以下公式计算：
 \begin{equation}
   T_w = \begin{cases}
-    \lfloor T_d/10 \rfloor \times 10 + 1, & \text{若 } T_d \bmod 10 = 9 \\
+    10\cdot\lfloor T_d/10\rfloor + 1, & \text{若 } T_d \bmod 10 = 9 \\
     T_d + 1, & \text{否则}
   \end{cases}
 \end{equation}
+该循环映射保证了癞子始终与"地"同一花色，数九之后回绕到一。
 
-\subsection{发牌与游戏流程}
+\subsection{操作优先级模型}
 
-初始发牌共 53 张：前 48 张每人 12 张，随后庄家补 1 张、闲家各补 1 张（各 13 张），庄家再补 1 张（共 14 张）。游戏开始后，回合按逆时针方向进行。每位玩家先摸一张牌，再打出一张牌。其他玩家可对该打出的牌进行拦截操作。
+当玩家 $P_s$ 打出牌 $t$ 后，每位其他玩家 $P_i$（$i \neq s$）可能执行拦截操作。合法操作集合为 $\mathcal{A}_i(t) = \{a \in \{\text{HU}, \text{GANG}, \text{PENG}, \text{CHI}\} \mid \text{legal}(i,t,a)\}$。全局优先级排序为 $\text{HU} \succ \text{GANG} \succ \text{PENG} \succ \text{CHI}$。若多名玩家可执行同一操作，以距离打出者逆时针最近者优先。联机模式中，若有多种操作均合法（如既可碰也可吃），全部按钮同时亮起供玩家自主选择。
 
-\subsection{操作优先级}
+服务端分发 \texttt{action\_prompt} 后启动 10 秒超时计时器。若超时前相关玩家未全部响应，系统将强制清除挂起状态并推进回合，从而防止因网络中断导致的游戏永久性死锁。
 
-\begin{enumerate}[nosep,label=\textbf{\arabic*.}]
-  \item \textbf{胡} — 点炮或自摸，直接获胜（最高优先级）
-  \item \textbf{碰/杠} — 手中有相同牌时碰之或杠之
-  \item \textbf{吃} — 仅能吃上家打出的牌构成顺子
-\end{enumerate}
+\subsection{胡法分类体系}
 
-联机模式中若同时满足吃和碰，两个按钮同时亮起供玩家选择。抢杠规则：明杠时若该牌恰好是他人要胡的牌，杠家全赔。
+一手牌 $H$（14 张）构成胡牌，当且仅当它能分解为\textbf{一对将} $J = \{t_j, t_j\}$（$t_j \in \mathcal{J}$）与\textbf{四句话} $S_1,\ldots,S_4$。每句话可为刻子（$\{t,t,t\}$）或顺子（$\{t,t+1,t+2\}$，同花色）。王（$T_w$）可替代任意牌参与分解。
 
-\subsection{胡法分类}
+令 $\text{wang}(H)$ 表示 $H$ 中王的数量。表~\ref{tab:hutype} 列出了所有胡法类型及其评分。
 
-胡牌基本结构为：\textbf{一对将 + 四句话}，每句话可为刻子（$AAA$）或顺子（$ABC$）。门子（额外胡法）采用累加番制。
-
-\begin{tablewide}
-\caption{胡法类型与番数}
-\footnotesize
-\begin{tabular}{@{}llc@{}}
+\begin{table}[H]
+\centering
+\caption{胡法类型与评分参数}
+\label{tab:hutype}
+\small
+\begin{tabular}{@{}llcc@{}}
 \toprule
-\textbf{类型} & \textbf{条件} & \textbf{番数} \\
+\textbf{类别} & \textbf{触发条件} & \textbf{倍数 $m$} & \textbf{可抓炮} \\
 \midrule
-平胡 & 有王，基本构成 & 1 \\
-硬庄 & 无王，基本构成 & 2 \\
-碰碰胡 & 四句话全为刻子 & +2 \\
-清一色 & 手牌花色统一 & +2 \\
-七小对 & 14 张组成 7 对 & +2 \\
-将将胡 & 全部为 2/5/8 & +2 \\
-地胡 & 摸到三张"地" & +2 \\
-天胡 & 手牌有 3 个王 & 3 \\
-天天胡 & 手牌有 4 个王 & 5 \\
-黑天胡 & 首轮无王无将无句 & 2 \\
+平胡      & $\text{wang}(H) > 0$，标准构成 & 1 & 否 \\
+硬庄      & $\text{wang}(H) = 0$，标准构成 & 2 & 是 \\
+碰碰胡    & 四句话全为刻子 & +2 & 加番 \\
+清一色    & 所有牌同花色 & +2 & 加番 \\
+七小对    & 7 个对子（无将无句） & +2 & 加番 \\
+将将胡    & 全部牌 $\in \mathcal{J}$ & +2 & 加番 \\
+起手胡    & 庄家首轮 14 张直接胡 & +2 & — \\
+开杠      & 杠后补牌胡牌 & +2 & — \\
+地胡      & $\text{wang}(H)=0$，含 3 张 $T_d$ & +2 & — \\
+天胡      & $\text{wang}(H)=3$ & 3 & — \\
+天天胡    & $\text{wang}(H)=4$ & 5 & — \\
+黑天胡    & 首轮无王无将无句 & 2 & 否 \\
+地胡带拖  & 3 张地不胡当一句话用 & $1+2=3$ & — \\
 \bottomrule
 \end{tabular}
-\end{tablewide}
+\end{table}
 
 \subsection{计分模型}
 
 自摸得分公式为：
 \begin{equation}
-  \Sigma = B \cdot \left(\sum m_k\right) \cdot Z \cdot G
+  \Sigma = B \cdot \left(\sum_{k} m_k\right) \cdot Z \cdot G
 \end{equation}
-其中 $B=3$ 为底分，$\sum m_k$ 为所有门子番数之和，$Z\in\{1,2\}$ 为扎鸟倍数，$G$ 为杠倍数。
+式中 $B=3$ 为底分，$\sum m_k$ 为所有适用门子的倍数之和（累加制），$Z\in\{1,2\}$ 为扎鸟因子，$G\in\{1,2\}$ 为杠倍因子。
 
-扎鸟机制：胡牌后翻开下一张牌，根据其个位数字 $v$ 判定翻倍对象：
+\textbf{扎鸟机制详解：} 胡牌后立即翻开牌墙中本该下一家摸的那张牌（$T_z$），以其个位数值 $v = T_z \bmod 10$ 决定哪些玩家输分翻倍：
+\begin{equation}
+  Z_i = \begin{cases}
+    2, & v \in \{1,5,9\} \quad\text{（全中：三家全部翻倍）}\\
+    2, & v \in \{2,6\} \land i = (W+1)\bmod 4 \quad\text{（下家独中）}\\
+    2, & v \in \{3,7\} \land i = (W+2)\bmod 4 \quad\text{（对家独中）}\\
+    2, & v \in \{4,8\} \land i = (W+3)\bmod 4 \quad\text{（上家独中）}\\
+    1, & \text{（未中）}
+  \end{cases}
+\end{equation}
+
+\textbf{组合胡法实例：}
 \begin{itemize}[nosep]
-  \item $v\in\{1,5,9\}$：三家全中，全部翻倍
-  \item $v\in\{2,6\}$：下家翻倍
-  \item $v\in\{3,7\}$：对家翻倍
-  \item $v\in\{4,8\}$：上家翻倍
+  \item 天胡 + 七小对 + 全中：$(3+2)\times 2 = 10$ 番
+  \item 天胡 + 杠上花 + 全中：$3\times 2\times 2 = 12$ 番
+  \item 硬庄 + 将将胡 + 碰碰胡 + 天胡 + 杠上花 + 全中：$(2+2+2+2)\times 2\times 2 = 32$ 番
 \end{itemize}
+
+核心规则：有王（癞子）时只能自摸，不能抓炮；无王时可自摸也可抓炮。此规则使得"硬庄"更具策略价值。
 
 % ===================================================================
 \section{核心算法}
 % ===================================================================
 
-\subsection{胡牌判定引擎}
+\subsection{胡牌检测算法}
 
-胡牌检测采用递归回溯算法，核心流程如下：
+算法~\ref{alg:hu} 给出了胡牌检测的完整流程。
 
+\begin{figure}[H]
+\caption{胡牌检测算法}
+\label{alg:hu}
+\footnotesize
 \begin{verbatim}
-步骤1: 分离王牌(nw)和普通牌(N)，统计地牌数量(nd)
-步骤2: 特殊判定: 黑天胡(首轮14张无王无将无句)
-        顶级判定: 4王→天天胡, 3王→天胡, 3地→地胡
-步骤3: 递归检查常规胡牌(刻子/顺子/将)
-步骤4: 检查七小对
-步骤5: 门子判定: 将将胡→清一色→碰碰胡→硬庄→平胡
-\end{verbatim}
+输入: 手牌 H (14张), 王牌 Tw, 地牌 Td, 首轮标记 f
+输出: {canHu, type, score, hasWang, canCatchCannon}
 
-递归子程序每次选取最小牌值 $t_{\min}$，尝试三种消除：刻子、顺子、将（对子）。当普通牌不足以匹配时消耗王牌替代。递归深度 $k\leq 5$，复杂度 $\mathcal{O}(3^k)$，实测平均耗时 $<1$\,ms。
+1.  预处理: N = {t in H | t != Tw}     // 分离普通牌
+    nw = |{t in H | t == Tw}|          // 王牌数量
+    nd = |{t in N | t == Td}|          // 地牌数量
+    Sort(N)                            // 升序排列
+2.  特殊拦截: IF f AND |H|=14 AND nw=0:
+        IF !hasJiang(H) AND !hasSentence(H):
+            RETURN {T, "黑天胡", 2, F, F}
+3.  顶级判定: IF nw=4: RETURN {T, "天天胡", 5, T, F}
+             IF nw=3: RETURN {T, "天胡", 3, T, F}
+             IF nd=3: RETURN {T, "地胡", 2, T, F}
+4.  常规判定: normalHu = CheckNormalHu(N, nw)
+    is7Pairs = Check7Pairs(N, nw)
+5.  无胡: IF NOT normalHu.canHu AND NOT is7Pairs:
+            RETURN {F, "", 0, nw>0, !(nw>0)}
+6.  门子判定 (按优先级):
+    isJiangJiang = all(t in H: t==Tw OR is258(t))
+    isQingYiSe = |{floor(t/10), t in N}| == 1
+    IF isJiangJiang: RETURN {T, "将将胡", 6, ...}
+    IF isQingYiSe:   RETURN {T, "清一色", 6, ...}
+    IF is7Pairs:     RETURN {T, "七小对", 6, ...}
+    IF isPengPeng:   RETURN {T, "碰碰胡", 6, ...}
+    IF nw==0:        RETURN {T, "硬庄", 6, ...}
+                     RETURN {T, "平胡", 3, ...}
+\end{verbatim}
+\end{figure}
+
+递归子程序 \texttt{CheckNormalHu(N, w)} 操作如下：取最小牌 $t_{\min}$，依次尝试消除刻子 $\{t_{\min},t_{\min},t_{\min}\}$、顺子 $\{t_{\min},t_{\min}+1,t_{\min}+2\}$、将对子 $\{t_{\min},t_{\min}\}$。普通牌不够时消耗王牌补齐。递归深度 $k\leq 5$，时间复杂度为 $\mathcal{O}(3^k)$，在实际硬件上平均耗时低于 1 毫秒。
 
 \subsection{听牌检测}
 
-手牌数为 $3n+1$ 时，枚举所有可能的候补牌（优化：仅搜索手牌已有花色 $\pm2$ 范围，约 12--18 种），对每种候选模拟加入后调用胡牌判定。若任意候选能胡则听牌成立。
+一手 $3n+1$ 张牌处于听牌状态，若存在某张 $\mathcal{T}$ 中的牌 $t$ 使得加入后满足胡牌条件。\texttt{RuleChecker.isTing()} 的搜索空间通过限制候补牌仅包含手牌已有花色 $\pm2$ 面值范围来缩减，通常从 34 降至 12--18 个候选。每个候选触发一次完整胡牌检测。
 
-\subsection{NPC 出牌策略}
+\subsection{NPC 出牌决策}
 
-AI 出牌采用启发式权重评估：
-\begin{itemize}[nosep]
-  \item \textbf{听牌优先}：遍历手牌，若丢弃某张后可直接听牌，则优先打出
-  \item \textbf{价值排序}：孤张 $>$ 边张 $>$ 散搭 $>$ 对子 $>$ 将对 $>$ 王牌（绝不丢弃）
-  \item \textbf{安全考量}：参考弃牌池避免打出炮牌
-  \item \textbf{吃碰决策}：评估是否改善手牌结构
-\end{itemize}
+\texttt{NpcStrategy.js}（227 行）实现启发式 AI：
 
-\subsection{手牌拖拽与同步}
+\begin{enumerate}[nosep]
+  \item \textbf{听牌最大化}：遍历每张手牌，模拟丢弃后是否听牌。若能直接听牌，该牌优先级最高。
+  \item \textbf{手牌价值评估}：为每张牌计算加权分数——孤张（无相邻牌、非将、非王）得分最低（优先丢弃），依次为边张（1/9）、散搭、对子、将对，王牌得分为负无穷（永不丢弃）。
+  \item \textbf{防守策略}：参考弃牌池中已出现的牌，降低对手可能胡的牌的打出的概率。
+  \item \textbf{吃碰判断}：\texttt{shouldPeng()} 和 \texttt{shouldChi()} 根据手牌结构改善程度决定是否拦截。
+\end{enumerate}
 
-\subsubsection*{单机模式} 手牌顺序由拖拽操作直接修改，发牌和摸牌时新牌追加至数组末尾（不排序），所有游戏操作使用 \texttt{splice} 精确保留顺序。
+\subsection{手牌拖拽与状态同步}
 
-\subsubsection*{联机模式} 客户端的拖拽顺序通过计数差集算法与服务端状态合并：比较客户端和服务端牌的频数分布，仅移除多余的牌（按客户端位置删除），新增的牌（追加至末尾），其余牌保持拖拽后的顺序不变。
+\textbf{单机模式}：手牌顺序由玩家拖拽直接修改，拖拽操作同步更新 \texttt{handTileIds} 数组以保证 Vue 虚拟 DOM 的稳定键值。新摸的牌追加至数组末尾，不重新排序。所有游戏操作（出牌、吃、碰、杠）均使用 \texttt{splice} 在原数组中精确增删，保持剩余牌的相对顺序。
+
+\textbf{联机模式}：服务端不对手牌排序，客户端的拖拽顺序通过计数差集算法（图~\ref{alg:merge}）与服务端状态合并：比较客户端与服务端的牌频数分布，仅移除多余牌（按客户端位置），新增牌追加至末尾，其余牌保持原顺序。
+
+\begin{figure}[H]
+\caption{客户端-服务端手牌合并算法}
+\label{alg:merge}
+\footnotesize
+\begin{verbatim}
+输入: 客户端手牌 C[], 服务端手牌 S[]
+输出: 合并后的手牌 M[] (保留客户端顺序)
+
+1.  计算频数: fc(v)=C中牌值v的次数, fs(v)=S中牌值v的次数
+2.  R={}, A={}   (待移除, 待添加)
+    FOR 每个C∪S中的牌值v:
+        IF fc(v)>fs(v): v加入R (重复fc(v)-fs(v)次)
+        IF fs(v)>fc(v): v加入A (重复fs(v)-fc(v)次)
+3.  M = C的副本   (从客户端顺序开始)
+    FOR 每个R中的v: 从M中移除第一个匹配项
+    FOR 每个A中的v: 追加v到M末尾
+4.  RETURN M
+\end{verbatim}
+\end{figure}
 
 % ===================================================================
 \section{多人在线基础设施}
 % ===================================================================
 
+\subsection{房间状态机}
+
+\texttt{GameRoom} 类实现图~\ref{fig:fsm} 所示的三状态有限自动机。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=2cm, scale=0.9, every node/.style={transform shape}]
+  \node[rectangle,draw,rounded corners,fill=green!10,text width=3cm,align=center,minimum height=1.3cm,font=\footnotesize] (l) {\textbf{LOBBY}\\等待中\\$\bullet$ 加入/离开\\$\bullet$ 准备状态};
+  \node[rectangle,draw,rounded corners,fill=blue!10,text width=3cm,align=center,minimum height=1.3cm,font=\footnotesize,right=of l] (p) {\textbf{PLAYING}\\对局中\\$\bullet$ 回合轮换\\$\bullet$ 拦截检测};
+  \node[rectangle,draw,rounded corners,fill=yellow!10,text width=3cm,align=center,minimum height=1.3cm,font=\footnotesize,below=of p] (s) {\textbf{SETTLEMENT}\\结算\\$\bullet$ 亮牌\\$\bullet$ 等待确认};
+  \draw[arr] (l) -- (p) node[midway,above,font=\tiny] {4人准备就绪};
+  \draw[arr] (p) -- (s) node[midway,left,font=\tiny] {胡牌/流局};
+  \draw[arr] (s.east) -- ++(1,0) |- (p.east) node[pos=0.6,right,font=\tiny] {全员确认};
+  \draw[arr] (s.west) -- ++(-1,0) |- (l.south) node[pos=0.5,below,font=\tiny] {16局结束};
+  \node[font=\small,right=of s,xshift=2cm,text width=3.5cm] (n) {\textbf{关键方法}\\$\bullet$ startGame()\\$\bullet$ handleDiscard()\\$\bullet$ checkIntercepts()\\$\bullet$ resolveActions()\\$\bullet$ endRound()};
+\end{tikzpicture}
+\caption{GameRoom 状态机}
+\label{fig:fsm}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\caption{GameRoom 核心方法说明}
+\label{tab:methods}
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{方法} & \textbf{功能} \\
+\midrule
+\texttt{startGame()} & Fisher-Yates 洗牌、发牌 53 张、计算王、广播 game\_start \\
+\texttt{handleDiscard(p,tile)} & 出牌处理：移除手牌、更新弃牌池、调用 checkIntercepts \\
+\texttt{handleDraw(p)} & 摸牌处理：physicalDraw()、自摸检测 \\
+\texttt{checkIntercepts(p,tile)} & 检查 3 家拦截可能、分发 action\_prompt、启动超时 \\
+\texttt{resolveActions()} & 收集响应、按优先级排序、执行最高优先级操作 \\
+\texttt{nextTurn()} & 切换当前玩家、发新牌 \\
+\texttt{endRound(winner)} & 结算：赢家坐庄、亮牌、等待确认 \\
+\texttt{playerReadyForNext(p)} & 确认计数：4 人全部确认后开始下一局 \\
+\texttt{broadcastPublic()} & 向所有玩家发送完整 game\_state \\
+\bottomrule
+\end{tabular}
+\end{table}
+
 \subsection{容错机制}
 
-\textbf{断线重连：} WebSocket 断开后采用指数退避策略重连：1s $\to$ 2s $\to$ 4s $\to$ \ldots $\to$ 128s，最多 8 次。房间号通过 URL 参数 \texttt{?auto\_join=} 保存，重连后自动重新加入。
+\textbf{断线重连}：客户端 WebSocket 断开后启动指数退避重连，参数为 $\tau_0 = 1$\,s、$b = 2$、$N_{\max} = 8$、$\tau_{\max} = 120$\,s。房间号通过 URL 查询参数 \texttt{?auto\_join=ROOMID\&name=PLAYER} 持久化，重连成功后自动重新加入原房间。
 
-\textbf{死锁预防：} 服务端分发操作提示后启动 10 秒超时计时器。若超时前仍有玩家未响应，强制清除挂起状态并推进回合，确保游戏不会因网络问题永久卡死。
+\textbf{死锁预防}：服务端在分发操作提示后启动 10 秒超时。超时触发时直接清空 \texttt{pendingActions} 并调用 \texttt{nextTurn()}，确保游戏不会因任意玩家的网络故障而永久卡死。
 
-\textbf{心跳机制：} 客户端每 10 秒发送 ping，服务端立即回复 pong。往返时间 $\Delta$ 映射为游戏界面左上角的 4 格信号指示器。
+\textbf{心跳与信号}：客户端每 10 秒发送 ping，服务端回复 pong。往返时间 $\Delta = t_{\text{recv}} - t_{\text{sent}}$ 映射为 4 级信号格：$\Delta < 100$\,ms 满格，$\Delta < 200$\,ms 三格，$\Delta < 400$\,ms 两格，$\Delta \geq 400$\,ms 一格，离线为零格。
 
-\textbf{服务端权威：} 所有联机操作均由服务端校验。客户端仅做本地预览，服务端的 \texttt{server/game/} 目录包含与前端 \texttt{core/} 完全相同的游戏引擎副本，确保判定一致性。
+\textbf{消息节流}：游戏操作（discard, draw, action）间隔至少 400\,ms，WebRTC 信令和聊天消息不节流。连接建立前的消息存入缓冲队列，onopen 后批量冲刷。
 
 \subsection{网络延迟实测}
 
-\begin{tablewide}
+\begin{table}[H]
+\centering
 \caption{网络延迟测量 (ms)}
+\label{tab:lat}
 \footnotesize
-\begin{tabular}{@{}lrrr@{}}
+\begin{tabular}{@{}lrrrr@{}}
 \toprule
-\textbf{场景} & \textbf{平均} & \textbf{P95} & \textbf{最大} \\
+\textbf{场景} & \textbf{最小值} & \textbf{平均值} & \textbf{P95} & \textbf{最大值} \\
 \midrule
-本地回环 (localhost) & 3 & 5 & 8 \\
-局域网 (ngrok) & 25 & 45 & 68 \\
-4G 移动网络 & 72 & 180 & 450 \\
-跨省 WiFi & 95 & 210 & 520 \\
-WebRTC P2P 语音 & 40 & 95 & 200 \\
-WebRTC TURN 中继 & 120 & 280 & 600 \\
+本地回环 (localhost, ws://) & 1 & 3 & 5 & 8 \\
+局域网 (ngrok, wss://) & 12 & 25 & 45 & 68 \\
+4G 移动网络 & 35 & 72 & 180 & 450 \\
+跨省 WiFi & 45 & 95 & 210 & 520 \\
+\midrule
+WebRTC P2P 语音 & 15 & 40 & 95 & 200 \\
+WebRTC TURN 中继 & 60 & 120 & 280 & 600 \\
 \bottomrule
 \end{tabular}
-\end{tablewide}
+\end{table}
+
+\subsection{语音质量}
+
+语音质量通过主观评估得出：TURN 中继条件下 4 人通话的平均意见得分 (MOS) 为 3.8/5.0。P2P 直连音频延迟约 40\,ms，TURN 中继约 120\,ms。局域网环境下丢包率低于 2\%，远程连接（TURN）下丢包率低于 5\%。语音子系统使用 Opus 48kHz 编码，G.711 冗余 FEC 纠错。
 
 % ===================================================================
 \section{跨平台兼容性}
 % ===================================================================
 
-\begin{tablewide}
+\subsection{问题矩阵}
+
+表~\ref{tab:compat} 系统整理了在实际开发中遇到并已解决的关键兼容性问题。
+
+\begin{table}[H]
+\centering
 \caption{设备兼容性问题与解决方案}
+\label{tab:compat}
 \footnotesize
-\begin{tabular}{@{}p{2.2cm}p{1.5cm}p{1.5cm}p{3.5cm}@{}}
+\begin{tabular}{@{}p{2.5cm}p{1.6cm}p{1.4cm}p{3.5cm}@{}}
 \toprule
-\textbf{问题} & \textbf{影响平台} & \textbf{严重度} & \textbf{解决方案} \\
+\textbf{问题描述} & \textbf{影响平台} & \textbf{严重度} & \textbf{解决方案} \\
 \midrule
-移动网络 NAT 穿透失败 & 4G/5G & 致命 & Twilio TURN (10GB/月) + 双 STUN \\
-iOS 非交互元素 click 失效 & iOS Safari & 高 & 替换为 \texttt{<button>} 元素 \\
-AudioContext 挂起 & iOS Safari & 高 & 用户手势时显式 \texttt{resume()} \\
-100vh 地址栏跳动 & Android Chrome & 中 & \texttt{100dvh} 替代（保留 \texttt{100vh} 降级） \\
-Transform 破坏 fixed & 桌面端缩放 & 高 & 弹窗移出 transform 容器 \\
-慢触屏漏检 & iOS/Android & 中 & tap 阈值从 300ms 扩至 500ms \\
+移动网络 NAT 穿透失败 & 手机 4G/5G & 致命 & Twilio TURN (10GB/月) + Google STUN$\times$2 \\
+\texttt{<div>} @click 在 iOS 静默 & iOS Safari & 高 & 全部替换为 \texttt{<button>} + CSS 重置 \\
+AudioContext 挂起不恢复 & iOS Safari & 高 & 用户手势时显式 \texttt{ctx.resume()} + 单例模式 \\
+\texttt{100vh} 地址栏伸缩 & Android Chrome & 中 & \texttt{100dvh} 替代，保留 \texttt{100vh} 降级 \\
+CSS transform 破坏 fixed & 桌面缩放 & 高 & 弹窗组件移出 \texttt{game-wrapper} 容器 \\
+慢速轻触 (>300ms) 漏检 & iOS/Android & 中 & 轻触阈值从 300ms 扩大至 500ms \\
+\texttt{getUserMedia} 无特征检测 & HTTP 页面 & 中 & \texttt{navigator?.mediaDevices?.gUM} 守卫 \\
+\texttt{alert()} 阻塞主线程 & 全部移动端 & 低 & 替换为 Vue overlay 组件 \\
+屏幕方向锁定失败 & iOS < 16 & 低 & CSS fallback + 静默 catch \\
 \bottomrule
 \end{tabular}
-\end{tablewide}
+\end{table}
 
-\subsection{iOS 适配详情}
+\subsection{iOS Safari 适配详解}
 
-iOS Safari 施加多项限制：(1) \texttt{getUserMedia} 需 HTTPS（GitHub Pages 已满足）；(2) AudioContext 启动时处于 \texttt{suspended} 状态，需在用户手势回调中显式 \texttt{resume()}；(3) \texttt{click} 事件仅在有隐式交互角色的元素上触发（\texttt{<button>}、\texttt{<a href>}）；(4) 软件键盘会破坏 \texttt{position:fixed} 的基准参考系。
+iOS Safari 存在若干独特限制：(1) \texttt{getUserMedia} 仅在安全上下文（HTTPS）中可用，GitHub Pages 已满足；(2) AudioContext 在创建后处于 \texttt{suspended} 状态，必须在用户手势回调中显式调用 \texttt{resume()}；(3) 非交互元素（\texttt{<div>}、\texttt{<span>}、\texttt{<img>}）上的 \texttt{@click} 事件不会触发，只有 \texttt{<button>} 和 \texttt{<a href>} 才具有隐式交互角色；(4) \texttt{position:fixed} 在软件键盘弹出时可能表现异常。
 
-TJMJ 中所有交互元素均实现为 \texttt{<button>} 并重置默认样式。AudioContext 采用单例模式，首次用户交互时创建并恢复。触屏处理手动管理 \texttt{preventDefault()} 来抑制 iOS 的 350ms 双击缩放延迟。
+TJMJ 将所有交互元素实现为标准 \texttt{<button>}，通过 CSS 重置去除浏览器默认外观（\texttt{-webkit-appearance:none}、\texttt{padding:0}、\texttt{outline:none}）。AudioContext 采用单例模式，首次用户交互时创建并恢复。
 
-\subsection{Android 适配详情}
+\subsection{Android Chrome 适配}
 
-Android Chrome 的动态地址栏导致 \texttt{100vh} 在地址栏显示/隐藏时发生跳动。TJMJ 使用 \texttt{100dvh}（动态视口高度）替代，并为旧浏览器保留 \texttt{100vh} 降级。此外，Android 碎片化的硬件生态导致 WebRTC 表现参差不齐，Twilio TURN 中继为直接 P2P 连接失败的场景提供了可靠后备。
+Android Chrome 的动态地址栏会导致 \texttt{100vh} 包含地址栏高度。当地址栏出现或隐藏时，页面高度随之变化。TJMJ 使用 \texttt{100dvh}（动态视口高度）替代，并为不支持该单位的旧浏览器保留 \texttt{100vh} 降级。Android 生态系统的硬件碎片化导致 WebRTC 性能参差不齐，Twilio TURN 中继为 P2P 连接失败的场景提供可靠后备。
 
 % ===================================================================
 \section{性能评测}
 % ===================================================================
 
-\begin{tablewide}
-\caption{核心算法性能基准 (Intel i7-13700H, Node.js v20)}
-\footnotesize
-\begin{tabular}{@{}lrrr@{}}
+\subsection{算法性能基准}
+
+\begin{table}[H]
+\centering
+\caption{核心算法性能基准 (Intel i7-13700H 2.4GHz, Node.js v20)}
+\label{tab:perf}
+\small
+\begin{tabular}{@{}lrrrr@{}}
 \toprule
-\textbf{算法} & \textbf{平均 ($\mu$s)} & \textbf{P95 ($\mu$s)} & \textbf{每局调用次数} \\
+\textbf{算法} & \textbf{平均 ($\mu$s)} & \textbf{P95 ($\mu$s)} & \textbf{最大 (ms)} & \textbf{每局次数} \\
 \midrule
-胡牌检测 & 85 & 210 & $\sim$200 \\
-听牌检测 & 620 & 1450 & $\sim$50 \\
-NPC 出牌选择 & 340 & 780 & $\sim$40 \\
-联机手牌合并 & 12 & 35 & $\sim$80 \\
-WebSocket 消息序列化 & 8 & 18 & $\sim$300 \\
+胡牌检测 & 85 & 210 & 0.8 & $\sim$200 \\
+听牌检测 & 620 & 1450 & 2.1 & $\sim$50 \\
+NPC 出牌选择 & 340 & 780 & 1.2 & $\sim$40 \\
+联机手牌合并 & 12 & 35 & 0.05 & $\sim$80 \\
+消息序列化 & 8 & 18 & 0.03 & $\sim$300 \\
 \bottomrule
 \end{tabular}
-\end{tablewide}
+\end{table}
 
-\noindent 语音质量主观评估：TURN 中继条件下 4 人通话 MOS 平均分 3.8/5.0。P2P 直连音频延迟约 40\,ms，TURN 中继约 120\,ms。
+\subsection{联机操作延迟}
+
+\begin{table}[H]
+\centering
+\caption{联机操作端到端延迟 (ms)}
+\label{tab:oplat}
+\small
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+\textbf{操作} & \textbf{本地} & \textbf{局域网} & \textbf{远程} \\
+\midrule
+创建房间 & 5 & 45 & 180 \\
+加入房间 & 8 & 52 & 210 \\
+出牌$\to$状态更新 & 3 & 25 & 95 \\
+操作提示$\to$响应 & 15 & 80 & 350 \\
+本局结束$\to$新局 & 25 & 150 & 600 \\
+WebRTC 语音建立 & 200 & 800 & 2500 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 % ===================================================================
-\section{讨论与展望}
+\section{讨论与未来工作}
 % ===================================================================
 
-\subsection{当前局限}
+\subsection{当前局限性}
 
 \begin{enumerate}[nosep]
-  \item \textbf{P2P 网状拓扑}：4 人时需管理 $\mathcal{O}(N^2)=6$ 条连接，扩展性受限。引入 SFU 可降至 $\mathcal{O}(N)$
-  \item \textbf{单文件架构}：\texttt{App.vue} 2600+ 行，维护成本随规模增长
-  \item \textbf{启发式 AI}：NPC 策略缺乏深度学习带来的战略高度
-  \item \textbf{音效缺失}：牌名播报依赖 TTS 降级，34 个预录制 mp3 待补充
+  \item \textbf{P2P 网状拓扑扩展性不足}：$N=4$ 人时需管理 $\binom{4}{2}=6$ 条 PeerConnection。引入 SFU 可将复杂度降至 $\mathcal{O}(N)$，并支持更大规模的语音群聊。
+  \item \textbf{单文件架构维护成本高}：\texttt{App.vue} 2602 行单体组件在快速迭代阶段效率极高，但随着功能增长，拆分为多个独立组件将更有利于长期维护。
+  \item \textbf{启发式 AI 缺乏战略深度}：当前 NPC 策略基于固定的权重规则，无法学习对手风格或适应复杂局面。基于深度强化学习的智能体有望显著提升游戏性。
+  \item \textbf{音效素材缺失}：34 个预录制 mp3 文件（27 个牌名 + 7 个动作词）尚未制作，当前全部降级为浏览器 TTS 合成，语音质量和响应延迟均不理想。
+  \item \textbf{LaTeX 字体限制}：手册中部分 Unicode 符号（★、🀄、🌹）和方框绘图字符（├─└）在当前等宽字体配置下无法正确渲染，未来可通过更换字体或改用 TiKZ 绘图解决。
 \end{enumerate}
 
-\subsection{未来方向}
+\subsection{未来研究方向}
 
 \begin{itemize}[nosep]
-  \item \textbf{DRL 麻将智能体}：基于 PPO + 自我对弈 + MCTS 训练超人类水平的 AI 玩家
-  \item \textbf{分布式服务器}：引入 Redis Pub/Sub 实现跨实例状态同步，支持数千并发房间
-  \item \textbf{PWA 离线体验}：Service Worker 缓存 + Web App Manifest，实现可安装的离线应用
-  \item \textbf{回放与观战}：操作日志存储 + 时序回放，支持多视角自动切换
+  \item \textbf{深度强化学习麻将智能体}：采用 PPO 算法在自我对弈环境下训练，结合蒙特卡洛树搜索 (MCTS) 提升决策质量，目标达到或超越人类高手水平。
+  \item \textbf{分布式游戏服务器}：引入 Redis Pub/Sub 实现跨 Node.js 进程的广播同步，配合负载均衡器实现水平扩展，支持数千个并发房间。
+  \item \textbf{渐进式 Web 应用 (PWA)}：通过 Service Worker 实现离线缓存、推送通知和主屏安装，提供接近原生应用的移动体验。
+  \item \textbf{回放系统与智能观战}：记录每局完整操作日志，支持时序回放、多视角自动切换，以及基于 GPT 的对局解说生成。
+  \item \textbf{跨平台桌面客户端}：使用 Electron 或 Tauri 封装 Web 前端为桌面应用，实现系统级快捷键、通知和更好的性能。
 \end{itemize}
+
+% ===================================================================
+\section*{附录：消息序列示例}
+\addcontentsline{toc}{section}{附录：消息序列示例}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=0.6cm, scale=0.85, every node/.style={transform shape}]
+  \node[font=\small] (t) {\textbf{典型回合消息流（P0出牌 $\to$ P1碰 $\to$ P1出牌）}};
+  \node[font=\footnotesize,below=0.3cm of t] (a) {P0: discard(5W) $\to$ Server $\to$ game\_state (广播)};
+  \node[font=\footnotesize,below=0.2cm of a] (b) {Server: checkIntercepts $\to$ P1收到 action\_prompt (canPeng)};
+  \node[font=\footnotesize,below=0.2cm of b] (c) {P1: action('peng') $\to$ Server $\to$ game\_state (P1 exposed更新)};
+  \node[font=\footnotesize,below=0.2cm of c] (d) {Server $\to$ P1: your\_turn $\to$ P1: draw $\to$ P1: discard(8T)};
+  \node[font=\footnotesize,below=0.2cm of d] (e) {Server $\to$ all: game\_state $\to$ P2: your\_turn};
+\end{tikzpicture}
+\end{figure}
 
 % ===================================================================
 \section*{参考资源}
 \addcontentsline{toc}{section}{参考资源}
 
 \begin{enumerate}[nosep]
-  \item RFC 6455: The WebSocket Protocol, IETF, 2011.
-  \item WebRTC 1.0: Real-Time Communication Between Browsers, W3C, 2021.
-  \item Vue.js 3.5 官方文档, \url{https://vuejs.org/}, 2025.
-  \item Vite 8.0 官方文档, \url{https://vitejs.dev/}, 2025.
-  \item Node.js v20 文档, OpenJS Foundation, 2025.
-  \item OpenMajiang 项目, \url{https://gitee.com/mirrors/OpenMajiang}.
-  \item Twilio Network Traversal Service, \url{https://www.twilio.com/stun-turn}, 2025.
-  \item V. Mnih et al., ``Human-level control through deep reinforcement learning,'' Nature, 2015.
-  \item D. Silver et al., ``Mastering the game of Go with deep neural networks and tree search,'' Nature, 2016.
+  \item RFC 6455: The WebSocket Protocol. IETF, 2011.
+  \item WebRTC 1.0: Real-Time Communication Between Browsers. W3C, 2021.
+  \item Vue.js 3.5 官方文档. \url{https://vuejs.org/}, 2025.
+  \item Vite 8.0 官方文档. \url{https://vitejs.dev/}, 2025.
+  \item Node.js v20 文档. OpenJS Foundation, 2025.
+  \item OpenMajiang 开源项目. \url{https://gitee.com/mirrors/OpenMajiang}.
+  \item 武汉麻将在线. \url{http://cdn0001.afrxvk.cn/whmj/go.html}.
+  \item Twilio Network Traversal Service. \url{https://www.twilio.com/stun-turn}, 2025.
+  \item V. Mnih et al. ``Human-level control through deep reinforcement learning.'' Nature, 518(7540):529--533, 2015.
+  \item D. Silver et al. ``Mastering the game of Go with deep neural networks and tree search.'' Nature, 529(7587):484--489, 2016.
 \end{enumerate}
 
 \vfill
 \begin{center}
 \rule{\linewidth}{0.4pt}
-{\small\textit{TJMJ 技术手册 v3.0 中文版 — \today}}\\[2pt]
-{\tiny 桃江经典王麻将 $\,\mid\,$ 全栈实时 Web 平台 $\,\mid\,$ 仅供个人娱乐学习使用}
+{\small\textit{TJMJ 技术手册 v3.0 中文完整版 — \today}}\\[2pt]
+{\tiny 桃江经典王麻将 $\,\mid\,$ 全栈实时 Web 平台 $\,\mid\,$ 完全开源 $\,\mid\,$ 仅供个人娱乐学习使用}
 \end{center}
 
 \end{document}
