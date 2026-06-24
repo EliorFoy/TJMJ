@@ -86,7 +86,16 @@
         <div class="ready-overlay" v-if="gameState.gamePhase === 'WAITING' && gameMode === 'multi'">
           <div v-if="!netState.roomId" class="lobby-dialog">
             <h2>联机大厅</h2>
-            <input v-model="multiState.playerName" placeholder="你的昵称" class="lobby-input" maxlength="8" />
+            <div class="nickname-row">
+              <div class="memory-wrap">
+                <button class="nick-btn memory-btn" @click="showMemory = !showMemory" title="记忆昵称">📋</button>
+                <div class="memory-popup" v-if="showMemory">
+                  <button v-for="name in memoryNames" :key="name" class="memory-chip" @click="multiState.playerName = name; showMemory = false">{{ name }}</button>
+                </div>
+              </div>
+              <input v-model="multiState.playerName" placeholder="你的昵称" class="lobby-input" maxlength="8" />
+              <button class="nick-btn dice-btn" @click="rollNickname" title="随机昵称">🎲</button>
+            </div>
             <button class="lobby-btn create" @click="createRoom" :disabled="multiState.creating">
               {{ multiState.creating ? '创建中...' : '创建房间' }}
             </button>
@@ -566,6 +575,18 @@ const multiState = reactive({
 });
 const dragIndex = ref(-1);    // 正在被拖拽的牌的索引
 const dragOverIndex = ref(-1); // 拖拽悬停的目标索引
+
+// 昵称记忆 & 随机
+const showMemory = ref(false);
+const memoryNames = ['Cjj','Zzw','Xjh','Xjt','Lsy','Syy','Hj','Lem'];
+const randomNames = ['祖国人','内向小男孩','乡里人','城里人','花开富贵','奥特曼','如来佛','机器人','最强NPC','AI','路障僵尸','阿强','阿珍','阿贵','超鬼','奥利给','球草','球花'];
+let lastRollIdx = -1;
+const rollNickname = () => {
+  let idx;
+  do { idx = Math.floor(Math.random() * randomNames.length); } while (idx === lastRollIdx && randomNames.length > 1);
+  lastRollIdx = idx;
+  multiState.playerName = randomNames[idx];
+};
 
 // 表情互动
 const emojis = [
@@ -2056,6 +2077,17 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .lobby-input { display: block; width: 220px; margin: 10px auto; padding: 10px 14px; font-size: 16px; border: 2px solid #555; border-radius: 10px; background: rgba(255,255,255,0.1); color: white; text-align: center; outline: none; }
 .lobby-input:focus { border-color: #ffd700; }
 .lobby-input.room-code { font-size: 24px; letter-spacing: 8px; text-transform: uppercase; }
+
+/* 昵称行：记忆框 + 输入框 + 骰子 */
+.nickname-row { display: flex; align-items: center; justify-content: center; gap: 8px; width: 280px; margin: 10px auto; }
+.nickname-row .lobby-input { margin: 0; flex: 1; min-width: 0; }
+.nick-btn { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #ccc; font-size: 16px; cursor: pointer; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; flex-shrink: 0; }
+.nick-btn:hover { background: rgba(255,255,255,0.18); color: #ffd700; border-color: #ffd700; }
+/* 记忆弹出框 */
+.memory-wrap { position: relative; }
+.memory-popup { position: absolute; left: 0; bottom: 44px; background: #1a1a2e; border: 1px solid #444; border-radius: 8px; padding: 6px; display: flex; flex-wrap: wrap; gap: 4px; width: 130px; z-index: 99; }
+.memory-chip { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #ddd; font-size: 12px; padding: 4px 8px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.memory-chip:hover { background: #ffd700; color: #1a1a2e; border-color: #ffd700; }
 .lobby-btn { display: block; width: 250px; margin: 10px auto; padding: 12px; font-size: 16px; font-weight: bold; border: none; border-radius: 12px; cursor: pointer; color: white; transition: 0.2s; }
 .lobby-btn.create { background: linear-gradient(145deg, #4CAF50, #2E7D32); }
 .lobby-btn.join { background: linear-gradient(145deg, #2196F3, #1565C0); }
