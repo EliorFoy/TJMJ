@@ -8,16 +8,19 @@ on:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
 
 jobs:
   deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
-      - name: 拉取最新代码
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: 配置 Node.js 环境
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
 
@@ -27,18 +30,17 @@ jobs:
       - name: 开始打包
         run: cd frontend && npm run build
 
-      # 以下步骤仅在 push main 时执行（PR 只检查 build）
-      - name: 配置 GitHub Pages
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/configure-pages@v4
-
-      - name: 上传打包好的成品
+      - name: 上传打包成品
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-pages-artifact@v3
         with:
           path: './frontend/dist'
 
-      - name: 🚀 部署上线！
+      - name: 配置 GitHub Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/configure-pages@v4
+
+      - name: 🚀 部署上线
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         id: deployment
         uses: actions/deploy-pages@v4
