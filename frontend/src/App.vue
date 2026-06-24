@@ -256,15 +256,15 @@
           <div class="settlement-panel">
             <h3>💰 手动结算</h3>
             <p :style="{ color: '#ffd700', fontWeight: 'bold', fontSize: '18px' }">{{ gameState.players[settlement.winnerIndex]?.name }} 胡牌！🎉</p>
-            <!-- 赢家全部手牌（含吃碰杠） -->
-            <div class="settlement-winner-tiles" v-if="gameState.showdownHands">
-              <span v-for="t in getWinnerFullHand()" :key="'wintile'+t" class="showdown-tile-wrapper">
-                <img :src="getImg('3d/lay_1.png')" class="showdown-tile-bg" />
-                <img :src="getImg(`tiles/${t}.png`)" class="showdown-tile-face" />
-              </span>
-            </div>
             <div class="settlement-row" v-for="(p, idx) in gameState.players" :key="'pay'+idx" :class="{ 'winner-row': idx === settlement.winnerIndex }">
               <span class="settlement-name" :class="{ 'winner-name': idx === settlement.winnerIndex }">{{ p.name }}</span>
+              <!-- 赢家全部手牌 -->
+              <span v-if="idx === settlement.winnerIndex && gameState.showdownHands" class="settlement-winner-tiles">
+                <span v-for="t in getWinnerFullHand()" :key="'wintile'+t" class="showdown-tile-wrapper">
+                  <img :src="getImg('3d/lay_1.png')" class="showdown-tile-bg" />
+                  <img :src="getImg(`tiles/${t}.png`)" class="showdown-tile-face" />
+                </span>
+              </span>
               <span v-if="idx === settlement.winnerIndex" class="settlement-winner">🎉 赢家</span>
               <template v-else>
                 <button class="settlement-pay-btn" @click="openNumpad(idx)">
@@ -451,21 +451,26 @@ const shuffle = (arr) => { const a = [...arr]; for (let i = a.length - 1; i > 0;
 // Web Audio 音量压缩器（统一所有歌曲音量）
 let _audioCtx = null;
 let _compressor = null;
-let _sourceNode = null; // 防止重复 createMediaElementSource
-const _ensureAudioCtx = async () => {
-  if (!_audioCtx) {
-    _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    _compressor = _audioCtx.createDynamicsCompressor();
-    _compressor.threshold.value = -24;
-    _compressor.knee.value = 30;
-    _compressor.ratio.value = 12;
-    _compressor.attack.value = 0.003;
-    _compressor.release.value = 0.25;
-    _compressor.connect(_audioCtx.destination);
-  }
-  if (_audioCtx.state === 'suspended') {
-    try { await _audioCtx.resume(); } catch(e) {}
-  }
+let _sourceNode = null;
+let _ctxPromise = null; // 缓存初始化 promise，避免重复 await
+const _ensureAudioCtx = () => {
+  if (_ctxPromise) return _ctxPromise;
+  _ctxPromise = (async () => {
+    if (!_audioCtx) {
+      _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      _compressor = _audioCtx.createDynamicsCompressor();
+      _compressor.threshold.value = -24;
+      _compressor.knee.value = 30;
+      _compressor.ratio.value = 12;
+      _compressor.attack.value = 0.003;
+      _compressor.release.value = 0.25;
+      _compressor.connect(_audioCtx.destination);
+    }
+    if (_audioCtx.state === 'suspended') {
+      try { await _audioCtx.resume(); } catch(e) {}
+    }
+  })();
+  return _ctxPromise;
 };
 const _connectBgmCompressor = (audio) => {
   if (!_audioCtx || !_compressor) return;
@@ -476,10 +481,10 @@ const _connectBgmCompressor = (audio) => {
   } catch(e) { _sourceNode = null; }
 };
 
-const playSong = async (filename) => {
+const playSong = (filename) => {
   const audio = bgMusic.value;
   if (!audio) return;
-  await _ensureAudioCtx();
+  _ensureAudioCtx(); // fire-and-forget，不阻塞
   audio.src = `/TJMJ/${encodeURI(filename)}`;
   audio.volume = 0.65;
   audio.load();
@@ -1159,21 +1164,15 @@ const joinRoom = async () => {
   multiState.joining = false;
 };
 
-// 安全刷新：联机保留房间重连，单机软重置不离开页面
+// 安全刷新：联机保留房间参数重载，单机直接刷新
 const safeRefresh = () => {
   if (gameMode.value === 'multi' && netState.roomId) {
-    // 联机模式：URL 保存房间号 + 昵称，刷新后自动重连
     const url = new URL(location.href);
     url.searchParams.set('auto_join', netState.roomId);
     url.searchParams.set('name', multiState.playerName);
     location.replace(url.toString());
   } else {
-    // 单机/观战：直接重新开局，不离开页面
-    gameState.gamePhase = 'WAITING';
-    gameState.showdownHands = null;
-    settlement.active = false;
-    closeAllPeerConnections();
-    handleReady();
+    location.reload();
   }
 };
 
@@ -2384,10 +2383,10 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .settlement-name { font-size: 14px; font-weight: bold; }
 .settlement-name.winner-name { color: #ffd700; font-size: 16px; text-shadow: 0 0 8px rgba(255,215,0,0.6); }
 .settlement-winner { color: #ffd700; font-size: 14px; }
-.settlement-winner-tiles { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; margin: 10px 0; }
-.settlement-winner-tiles .showdown-tile-wrapper { width: 32px; height: 44px; position: relative; display: inline-block; }
-.settlement-winner-tiles .showdown-tile-bg { width: 32px; height: 44px; position: absolute; top: 0; left: 32px; }
-.settlement-winner-tiles .showdown-tile-face { width: 32px; height: 44px; position: absolute; top: 0; left: 0; }
+.settlement-winner-tiles { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; margin: 4px 0; }
+.settlement-winner-tiles .showdown-tile-wrapper { width: 24px; height: 34px; position: relative; display: inline-block; }
+.settlement-winner-tiles .showdown-tile-bg { width: 24px; height: 34px; position: absolute; top: 0; left: 0; }
+.settlement-winner-tiles .showdown-tile-face { width: 24px; height: 34px; position: absolute; top: 0; left: 0; }
 .settlement-pay-btn { padding: 6px 14px; font-size: 13px; background: linear-gradient(145deg, #ff9800, #f57c00); border: none; border-radius: 8px; color: white; cursor: pointer; font-weight: bold; }
 .settlement-confirm-btn { padding: 6px 10px; font-size: 12px; background: #555; border: 1px solid #888; border-radius: 8px; color: white; cursor: pointer; margin-left: 4px; }
 .settlement-confirm-btn:disabled { opacity: 0.3; cursor: default; }
