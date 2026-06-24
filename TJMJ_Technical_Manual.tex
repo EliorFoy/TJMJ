@@ -1,0 +1,623 @@
+% ===========================================================================
+%  TJMJ — 桃江经典王麻将  技术手册 / 开发文档
+%  Nature-style LaTeX manuscript
+%  Compile: xelatex TJMJ_Technical_Manual.tex (requires XeLaTeX + Chinese fonts)
+% ===========================================================================
+\documentclass[11pt,a4paper]{article}
+
+% ---------- Font & encoding ----------
+\usepackage[UTF8]{ctex}          % 中文支持 (XeLaTeX 编译)
+\usepackage{fontspec}
+\setmainfont{Times New Roman}
+\setCJKmainfont{SimSun}[BoldFont=SimHei,ItalicFont=KaiTi]
+\setCJKmonofont{FangSong}   % CJK monospace (listings 等用)
+\usepackage[scaled]{helvet}
+% courier 字体某些变体不可用, 用 Latin Modern Mono 替代
+\renewcommand{\ttdefault}{lmtt}
+
+% ---------- Page layout ----------
+\usepackage{geometry}
+\geometry{top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm}
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textit{TJMJ Technical Manual}}
+\fancyhead[R]{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% ---------- Scientific packages ----------
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage[table]{xcolor}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows,positioning,fit}
+
+% ---------- Code listings ----------
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  rulecolor=\color{gray!40},
+  backgroundcolor=\color{gray!5},
+  keywordstyle=\color{blue}\bfseries,
+  commentstyle=\color{green!50!black},   % 中文注释不用斜体 (仿宋无 italic)
+  stringstyle=\color{red!70!black},
+  showstringspaces=false,
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  numbersep=5pt,
+  tabsize=2,
+  language={}             % no predefined language — manual keywords below
+}
+
+% ---------- Title / authors ----------
+\title{\bfseries\LARGE TJMJ: A Full-Stack Web-Based Taojiang Classic \\[2pt]
+       Wang Mahjong Platform for Entertainment \& Education}
+
+\author{%
+  JaiJaiC\thanks{Correspondence: Project homepage: \url{https://github.com/JaijaiC/TJMJ}}
+  \and
+  TJMJ Development Team \\
+  \small\textit{School of Entertainment Computing, TJMJ Lab} \\[4pt]
+  \small\texttt{\{jaijai.c\}@tjmj.dev}
+}
+\date{\today}
+
+% ---------- Abstract styling ----------
+\newcommand{\natureabstract}[1]{%
+  \begin{center}
+  \rule{\linewidth}{0.8pt}\\[2pt]
+  \begin{minipage}{0.95\linewidth}
+  \small\textbf{Abstract}\quad #1
+  \end{minipage}\\[2pt]
+  \rule{\linewidth}{0.4pt}
+  \end{center}
+  \vspace{4pt}
+}
+
+\begin{document}
+\maketitle
+
+\natureabstract{
+  桃江经典王麻将 (Taojiang Jingdian Wang Majiang, TJMJ) 是一款面向湖南桃江地区麻将爱好者的全栈网页麻将游戏平台。
+  本项目完整实现了桃江地方麻将的核心规则——包括打筛扳王(癞子)机制、扎鸟翻倍、门子加番、
+  组合胡法等复杂计分系统，并提供单人模式、四人联机对战、观战模式三大玩法。
+  技术架构采用 Vue 3 + Vite 前端、Node.js WebSocket 服务端、WebRTC 实时语音通信，
+  并通过 ngrok 实现公网穿透部署。本文系统阐述 TJMJ 的游戏规则数学模型、
+  软件架构设计、核心算法实现（胡牌判定、听牌检测、NPC 策略智能体），
+  并讨论当前技术瓶颈与未来 Mahjong Agent 训练方向。
+  本项目完全开源，仅供家庭娱乐与学术研究使用。
+}
+
+% ===================================================================
+\section{Introduction}
+% ===================================================================
+
+麻将 (Mahjong) 作为中国传统博弈游戏的代表，在湖南桃江地区形成了独具特色的地方变种——桃江经典王麻将。
+其核心特征包括：108 张万/筒/条字牌（不含风牌与花牌）、"王"（癞子/万能牌）机制、
+打筛扳王确定癞子、扎鸟翻倍计分、门子累加番型等复杂规则，与标准国标麻将或四川血战麻将存在显著差异。
+
+目前市面上仅有闲逸等少数 App 提供益阳麻将玩法，但其存在以下不足：
+(1) 需要注册登录，操作繁琐；
+(2) 规则与桃江本地玩法不完全一致；
+(3) 缺乏拖拽手牌、实时语音、文字弹幕等功能；
+(4) 无法训练 AI 对弈智能体。
+
+为此，我们设计并开发了 TJMJ——一款与桃江麻将规则高度一致、无需安装、
+点击链接即可进入的网页麻将平台。本文将从游戏规则数学建模（第 2 节）、
+系统架构（第 3 节）、核心算法（第 4 节）以及现存问题与未来工作（第 5 节）
+四个方面对该平台进行完整的技术阐述。
+
+
+% ===================================================================
+\section{Game Rules \& Mathematical Formulation}
+% ===================================================================
+
+\subsection{Tile Set \& Terminology}
+
+桃江麻将使用精简牌组——共 108 张牌，三种花色各 36 张：
+
+\begin{itemize}[nosep]
+  \item \textbf{万} (Wan, $W$): 一万 $\sim$ 九万，各 4 张 (11--19)
+  \item \textbf{条} (Tiao, $T$): 一条 $\sim$ 九条，各 4 张 (21--29)
+  \item \textbf{筒} (Tong, $B$): 一筒 $\sim$ 九筒，各 4 张 (31--39)
+\end{itemize}
+
+编码约定：花色十位数（1=万, 2=条, 3=筒）+ 数字个位数。
+例：$38$ 表示八筒，$15$ 表示五万。
+
+\textbf{术语表}：
+\begin{itemize}[nosep]
+  \item \textbf{王 (\textit{Wang})}： 癞子/万能牌，可替代任意牌使用。由开局"打筛扳王"确定。
+  \item \textbf{地 (\textit{Di})}： 扳开的那张牌本身，用于判定地胡。
+  \item \textbf{将 (\textit{Jiang})}： 数字为 2、5、8 的牌（任意花色），共 36 张。胡牌必需品。
+  \item \textbf{一句话 (\textit{YiJuHua})}： 三张牌构成 $AAA$（刻子）或 $ABC$（顺子，同花色连续）。
+  \item \textbf{听牌 (\textit{Ting})}： 13 张手牌差任意一张即可胡牌的状态。
+  \item \textbf{扎鸟 (\textit{ZhaNiao})}： 胡牌后翻下一张牌，根据数字确定输赢翻倍。
+  \item \textbf{门子 (\textit{MenZi})}： 特殊胡牌类型（碰碰胡、清一色等），采用累加番规则。
+\end{itemize}
+
+
+\subsection{Dice Rolling \& Wall Breaking}
+
+开局由庄家掷两枚骰子，骰子点数记为 $d_1, d_2$（$d_1 \leq d_2$，$d_i \in \{1,\dots,6\}$）。
+设 $S = d_1 + d_2$。
+
+\textbf{定庄与数墙}：
+庄家位置编号为 $P_0$，逆时针依次为下家 $P_1$、对家 $P_2$、上家 $P_3$。
+从庄家开始数到第 $S$ 家（庄家$=1,5,9$），该玩家面前的牌墙即为起手墙。
+
+\textbf{开牌位置}：在该墙右手边开始往左数，跳过 $d_1$（较小骰数）叠，从下一叠开始抓牌。
+
+\textbf{抓牌顺序}：庄家起抓，每人每次取一码（两叠=4张），共三轮（$3 \times 4 = 12$ 张/人）。
+然后"收庄"每人各补 1 张（各得 13 张），庄家再补 1 张（14 张），游戏开始。
+
+\textbf{扳王规则}：
+从起手墙对应玩家的下家墙左手边开始往右数，到第 $d_2$（较大骰数）叠处扳开最上面一张牌，
+此牌即为"地"（$T_d$），$T_d + 1$（模 10 循环，花色不变）即为"王"/癞子：
+\begin{equation}
+  T_w = \begin{cases}
+    \lfloor T_d/10 \rfloor \times 10 + 1, & \text{if } T_d \bmod 10 = 9 \\
+    T_d + 1, & \text{otherwise}
+  \end{cases}
+\end{equation}
+
+
+\subsection{Basic Actions \& Priority}
+
+玩家回合可执行以下操作，优先级由高到低：
+
+\begin{enumerate}[nosep,label=\textbf{\arabic*.}]
+  \item \textbf{胡 (Hu)} — 点炮/自摸，直接获胜（最高优先级）
+  \item \textbf{碰 (Pong)} / \textbf{杠 (Gang)} — 三张相同牌碰之；四张相同可开杠
+  \item \textbf{吃 (Chi)} — 仅能吃上家打出的牌，构成顺子
+\end{enumerate}
+
+优先级规则：\textbf{点炮（胡）$>$ 碰（杠）$>$ 吃}。抢杠规则：若明杠的牌恰好是别家要胡的牌，直接判杠家全赔（相当于抓炮）。
+
+\subsubsection*{吃 (Chi)}
+只能吃上家打出的牌，且必须与手中两张牌构成同花色顺子。例：上家打 $4$ 万，手中有 $(2,3)$ 或 $(3,5)$ 或 $(5,6)$ 万即可吃。
+
+\subsubsection*{碰 (Pong)}
+任意玩家打出一张牌，若手中有两张相同即可碰。碰后三张亮出（副露），手牌数减 2。
+
+\subsubsection*{杠 (Gang)}
+分明杠（他人打出，手中有三张）和暗杠（手中四张，未亮出）。开杠后重新掷骰子，从牌墙末尾倒数摸三张。若摸到能胡的牌直接胡（杠上花），否则由下家开始依次判定能否胡此三张。
+
+
+\subsection{Winning Patterns (Hu Types)}
+
+胡牌的基本结构为：\textbf{一对将 (Jiang) + 四句话 (Sentence)}，
+其中"一句话"可以是刻子（$AAA$）或顺子（$ABC$）。
+
+表~\ref{tab:hu_types} 列出了所有胡法类型及其番数。门子胡法采用\textbf{累加番}规则：
+胡牌总番数 $=$ 基础胡法番 $+$ 各门子番数之和。
+
+\begin{table}[H]
+\centering
+\caption{胡法类型与番数对照表}
+\label{tab:hu_types}
+\small
+\begin{tabular}{@{}llr@{}}
+\toprule
+\textbf{类型} & \textbf{条件} & \textbf{番数} \\
+\midrule
+平胡       & 有王，基本构成                & 1 番 \\
+硬庄       & 无王，基本构成                & 2 番 \\
+碰碰胡     & 四句话全为刻子 $AAA$          & 2 番 \\
+清一色     & 手牌全部同花色               & 2 番 \\
+七小对     & 14 张组成 7 个对子            & 2 番 \\
+将将胡     & 14 张全部为 2/5/8             & 2 番 \\
+起手胡     & 庄家 14 张首轮直接胡          & 2 番 \\
+开杠       & 明杠/暗杠后摸三张胡牌         & 2 番 \\
+地胡       & 摸到三张"地"即可胡           & 2 番 \\
+天胡       & 手牌有 3 个王               & 3 番 \\
+天天胡     & 手牌有 4 个王               & 5 番 \\
+黑天胡     & 首轮无王、无将、无一句话      & 2 番 \\
+地胡带拖   & 三张地不胡，当一句话用        & 3 番 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection*{组合胡法}
+当多种门子同时满足时，番数累乘。通用计算公式：
+\begin{equation}
+  S_{\text{自摸}} = \left(\sum \text{门子倍数}\right) \times F_{\text{扎鸟}} \times F_{\text{杠}}
+\end{equation}
+
+实例：
+\begin{itemize}[nosep]
+  \item 天胡七小对全中：$(3+2) \times 2 = 10$ 番
+  \item 天胡杠上花全中：$3 \times 2 \times 2 = 12$ 番
+  \item 硬庄将将胡碰碰胡天胡杠上花全中：$(2+2+2+2) \times 2 \times 2 = 32$ 番
+\end{itemize}
+
+
+\subsection{Scoring \& ZhaNiao (扎鸟)}
+
+胡牌分为\textbf{自摸}（自己摸到胡牌）和\textbf{抓炮}（他人打出胡牌）两种方式。
+
+\subsubsection*{自摸计分}
+胡牌后进行扎鸟：翻开本该下家摸的那张牌（$T_z$），根据 $T_z \bmod 10$ 的值判定翻倍对象：
+\begin{itemize}[nosep]
+  \item $1,5,9$（全中）：三家输分均翻倍
+  \item $2,6$：下家输分翻倍
+  \item $3,7$：对家输分翻倍
+  \item $4,8$：上家输分翻倍
+\end{itemize}
+
+设基础分 $B = 3$（平胡 1 番 $\times$ 底分 3），番数 $M$，扎鸟系数 $Z \in \{1,2\}$：
+赢家得分 $=$ 输家各支付 $B \times M \times Z$（扎中者）或 $B \times M$（未扎中者）。
+
+\subsubsection*{核心规则}
+有癞子只能自摸（不能抓炮），无癞子可以抓炮。这一规则使"硬庄"（无王胡牌）更具策略价值。
+
+
+% ===================================================================
+\section{System Architecture}
+% ===================================================================
+
+\subsection{Overview}
+
+TJMJ 采用典型的三层 B/S 架构，整体部署拓扑如图~\ref{fig:arch} 所示。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  node distance=1.2cm,
+  box/.style={rectangle, draw, rounded corners, minimum width=2.2cm, minimum height=0.8cm, align=center, font=\small},
+  arrow/.style={->, >=stealth, thick}
+]
+  \node[box, fill=blue!10] (browser) {Browser Client\\Vue 3 + Vite};
+  \node[box, fill=green!10, right=of browser] (ngrok) {ngrok Tunnel\\wss://};
+  \node[box, fill=orange!10, right=of ngrok] (ws) {WebSocket Server\\Node.js :8080};
+  \node[box, fill=red!10, below=of ws] (game) {Game Engine\\mjLogic.js};
+  \node[box, fill=purple!10, left=of game] (ai) {AI Agent\\NpcStrategy.js};
+
+  \draw[arrow] (browser) -- (ngrok);
+  \draw[arrow] (ngrok) -- (ws);
+  \draw[arrow] (ws) -- (game);
+  \draw[arrow] (game) -- (ai);
+  \draw[arrow] (browser) to[out=-30, in=-150] node[below, font=\footnotesize] {WebRTC Voice} (browser);
+\end{tikzpicture}
+\caption{系统架构拓扑图}
+\label{fig:arch}
+\end{figure}
+
+
+\subsection{Frontend — Vue 3 SPA}
+
+前端是基于 Vue 3 的单页应用（SPA），使用 Vite 构建，部署于 GitHub Pages。
+
+\textbf{技术栈}：
+\begin{itemize}[nosep]
+  \item \textbf{Vue 3.5} (Composition API + reactive) — 响应式UI框架
+  \item \textbf{Vite 8.x} — 构建工具 (HMR 热更新)
+  \item \textbf{Web Speech API} — 浏览器内置语音播报
+  \item \textbf{Web Audio API} — BGM 背景音乐管理
+  \item \textbf{WebRTC} — 点对点实时语音通信
+\end{itemize}
+
+\textbf{源码结构}：
+\begin{lstlisting}[language=,basicstyle=\ttfamily\tiny]
+frontend/src/
+  main.js              # Vue 入口
+  App.vue              # 主游戏界面 (3000+ loc)
+  style.css            # 全局样式
+  core/
+    constants.js       # 牌花色定义、258判定、王计算
+    HuCalculator.js    # 胡牌判定引擎
+    RuleChecker.js     # 吃碰杠听牌检测
+  utils/
+    mjLogic.js         # 洗牌、牌墙布局
+    speech.js          # 语音播报(吃碰杠胡)
+  ai/
+    NpcStrategy.js     # NPC 出牌决策策略
+  network/
+    client.js          # WebSocket 联机客户端
+\end{lstlisting}
+
+
+\subsection{Backend — Node.js WebSocket Server}
+
+服务端基于 Node.js + ws 库，负责房间管理、游戏状态同步、操作合法性校验。
+
+\textbf{技术栈}：
+\begin{itemize}[nosep]
+  \item \textbf{Node.js} — 运行时
+  \item \textbf{ws} (v8.18) — WebSocket 服务端
+  \item \textbf{uuid} (v10) — 房间号生成
+\end{itemize}
+
+\textbf{源码结构}：
+\begin{lstlisting}[language=,basicstyle=\ttfamily\tiny]
+server/
+  index.js             # WS 入口，消息路由 (180 loc)
+  GameRoom.js          # 房间管理、游戏流程
+  game/
+    constants.js       # 牌定义 (前端镜像)
+    mjLogic.js         # 洗牌、牌墙布局 (前端镜像)
+    HuCalculator.js    # 胡牌计分引擎
+    RuleChecker.js     # 操作合法性校验
+\end{lstlisting}
+
+
+\subsection{Communication Protocol}
+
+客户端与服务器通过 WebSocket 进行 JSON 消息通信。核心消息类型：
+
+\begin{table}[H]
+\centering
+\caption{WebSocket 消息协议}
+\label{tab:protocol}
+\tiny
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{type} & \textbf{方向} & \textbf{说明} \\
+\midrule
+\texttt{create\_room} & C→S & 创建房间 \\
+\texttt{join\_room}   & C→S & 加入房间 (8888=测试) \\
+\texttt{ready}        & C→S & 准备就绪 \\
+\texttt{discard}      & C→S & 出牌 \\
+\texttt{draw}         & C→S & 摸牌 \\
+\texttt{action}       & C→S & 吃/碰/杠/胡操作 \\
+\texttt{pass}         & C→S & 过牌 \\
+\texttt{pay}          & C→S & 手动转分 \\
+\texttt{emoji}        & C↔S & 表情 \\
+\texttt{chat}         & C↔S & 文字弹幕 \\
+\texttt{webrtc\_*}    & C↔S & WebRTC 信令中继 \\
+\texttt{join\_spectate}& C→S & 观战 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Network Topology \& ngrok}
+
+本地开发使用 \texttt{ws://localhost:8080} 直连；公网部署通过 ngrok 建立 TCP 隧道，
+客户端自动检测 \texttt{location.hostname} 切换 \texttt{wss://} 连接。
+消息发送采用\textbf{缓冲队列}机制：连接建立前的消息先入队，\texttt{onopen} 后批量冲刷，
+避免连接尚未就绪时 send 报错。
+
+
+% ===================================================================
+\section{Core Algorithms}
+% ===================================================================
+
+\subsection{Hu Detection Algorithm (胡牌判定)}
+
+胡牌判定是麻将引擎最核心的算法模块，对应文件 \texttt{HuCalculator.js}。
+算法采用\textbf{递归回溯 + 贪心剪枝}策略：
+
+\begin{enumerate}[nosep]
+  \item \textbf{预处理}：分离王牌与普通牌，统计 $n_w$（王数量）和 $n_d$（地数量）
+  \item \textbf{特殊拦截}：首轮 14 张检查黑天胡（无王、无将、无一句话）
+  \item \textbf{顶级判定}：4 王→天天胡, 3 王→天胡, 3 地→地胡
+  \item \textbf{常规判定}：调用 \texttt{checkNormalHu()} 递归去除刻子/顺子
+  \item \textbf{七小对判定}：调用 \texttt{check7Pairs()} 贪心配对
+  \item \textbf{门子判定}：将将胡→清一色→碰碰胡→硬庄→软庄，依序匹配
+\end{enumerate}
+
+\texttt{checkNormalHu(normalTiles, wangCount)} 的递归逻辑：
+\begin{enumerate}[nosep]
+  \item 若王充足，补齐对子（将）后递归去除句子
+  \item 每次选择最小的牌 $t_{\min}$，尝试三种消除：
+    \begin{itemize}[nosep]
+      \item 刻子：$\{t,t,t\}$ 三张相同
+      \item 顺子：$\{t,t+1,t+2\}$ 三张连续（同花色）
+      \item 对子：$\{t,t\}$ 作为将（仅当将未确定时）
+    \end{itemize}
+  \item 若普通牌无法匹配，消耗 1 个王替代，继续递归
+  \item 全部消除成功 → 胡牌；任何分支失败 → 回溯
+\end{enumerate}
+
+
+\subsection{Ting Detection Algorithm (听牌检测)}
+
+听牌检测用于判断 13 张手牌是否差一张即可胡牌，以及开杠后是否能听牌。
+对应 \texttt{RuleChecker.isTing()}：
+
+\begin{enumerate}[nosep]
+  \item 手牌数若不为 $3n+1$，直接返回 false
+  \item 枚举所有可能的 34 种牌（效率优化：仅搜索手牌已有花色 $\pm 2$ 范围）
+  \item 对每种候选牌 $t$，模拟加入手牌后调用 \texttt{HuCalculator.checkHu()}
+  \item 若任意候选能胡 → 听牌 true；否则 false
+\end{enumerate}
+
+此算法的正确性依赖于胡牌判定引擎的完备性。计算复杂度 $O(34 \times 3^k)$，
+其中 $k$ 为递归深度（通常 $k \leq 4$，实战 < 1ms）。
+
+
+\subsection{NPC Strategy Agent (AI 出牌决策)}
+
+\texttt{NpcStrategy.js} 实现了一个基于启发式规则的单人模式 NPC 智能体。
+当前版本采用\textbf{手牌价值评估 + 听牌最大化}策略：
+
+\begin{enumerate}[nosep]
+  \item \textbf{听牌优先}：遍历每张手牌，模拟丢弃后检查是否听牌
+    (\texttt{findBestDiscardToTing()})。若能直接听牌，优先打出该牌。
+  \item \textbf{价值排序}：若未听牌，按优先级评估手牌价值
+    (\texttt{chooseWorstTile()})：
+    \begin{itemize}[nosep]
+      \item 孤张（无相邻牌、非将、非王）→ 最优先丢弃
+      \item 边张/坎张（只能等 1 张进张）→ 次优先
+      \item 搭子（差 1 张成顺子/刻子）→ 保留
+      \item 将对（2/5/8 对子）→ 高价值保留
+      \item 王牌 → 绝不丢弃
+    \end{itemize}
+  \item \textbf{安全出牌}：参考弃牌池，避免打出别家可能胡的"炮牌"
+\end{enumerate}
+
+未来工作：将 NPC 升级为基于深度强化学习（DRL）的 Mahjong Agent，
+使用蒙特卡洛树搜索 (MCTS) 与自我对弈 (Self-Play) 训练。
+
+
+% ===================================================================
+\section{Features \& User Interface}
+% ===================================================================
+
+\subsection{Game Modes}
+
+平台提供三种游戏模式：
+
+\begin{enumerate}[nosep]
+  \item \textbf{单人模式}：玩家 vs 3 个 NPC AI，适合练习
+  \item \textbf{联机模式}：4 人实时对战，创建/加入房间（4 位数字房间号）
+  \item \textbf{观战模式}：旁观正在进行的对局（每次仅可选择一方视角）
+\end{enumerate}
+
+\subsection{Interactive Features}
+
+\begin{itemize}[nosep]
+  \item \textbf{拖拽手牌}：手牌可自由拖动排列，自动摸张固定在右侧
+  \item \textbf{表情系统}：点击头像可向其他玩家发送表情包
+  \item \textbf{实时转分}：点击头像下方计分区域可手动转分
+  \item \textbf{文字弹幕}：右上角聊天按钮，支持全屏弹幕聊天
+  \item \textbf{实时语音}：基于 WebRTC 的点对点语音通信
+  \item \textbf{BGM 控制}：首页轻触声音按钮开关背景音乐；
+        局内右上角切换钢琴纯音乐模式
+  \item \textbf{语音播报}：浏览器内置 TTS 播报"吃""碰""杠""胡了"等操作
+\end{itemize}
+
+
+% ===================================================================
+\section{Discussion}
+% ===================================================================
+
+\subsection{Known Issues}
+
+当前版本存在以下技术瓶颈：
+
+\begin{enumerate}[nosep]
+  \item \textbf{兼容性问题}：安卓/iOS、手机/桌面端渲染差异导致偶发 UI 错位
+  \item \textbf{实时语音不稳定}：WebRTC 多人（≥3）出现断连/回声，需引入 SFU 中转
+  \item \textbf{结算界面不完整}：结束时无法查看赢家完整手牌
+  \item \textbf{麻将音效缺失}：需补充"一万""吃""我胡了"等地方语音音效
+  \item \textbf{昵称不可修改}：当前无改名功能
+  \item \textbf{断线重连缺失}：服务器断开后无法恢复房间状态
+  \item \textbf{复杂吃碰逻辑卡死}：高频操作下偶发 UI 冻结，需引入操作节流与状态机
+  \item \textbf{托管模式}：胡牌判定失败或卡死后缺乏自动恢复机制
+\end{enumerate}
+
+\subsection{Future Work: Mahjong Agent}
+
+项目规划的核心远期目标是训练一个高性能 Mahjong Agent：
+\begin{itemize}[nosep]
+  \item 利用完美信息自我对弈 (Self-Play) 生成训练数据
+  \item 采用深度 Q 网络 (DQN) 或 PPO 算法学习出牌策略
+  \item 引入蒙特卡洛树搜索 (MCTS) 提升决策质量
+  \item 目标：Agent 达到或超越人类高手水平，成为玩家的学习陪练
+\end{itemize}
+
+
+% ===================================================================
+\section{Methods}
+% ===================================================================
+
+\subsection{Development Environment}
+
+\begin{table}[H]
+\centering
+\caption{开发环境与依赖}
+\label{tab:env}
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{组件} & \textbf{版本/技术} \\
+\midrule
+前端框架    & Vue 3.5 (Composition API) \\
+构建工具    & Vite 8.0 \\
+服务端      & Node.js + ws 8.18 \\
+语音        & Web Speech API + WebRTC \\
+内网穿透    & ngrok \\
+版本管理    & Git + GitHub \\
+部署        & GitHub Pages (前端) + ngrok (后端) \\
+\midrule
+Node 依赖   & vue, vite, @vitejs/plugin-vue, gh-pages \\
+            & ws, uuid \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\subsection{Deployment}
+
+\textbf{启动命令}（Windows）：
+\begin{lstlisting}[language=bash, basicstyle=\ttfamily\small]
+# 一键启动所有服务
+.\start-all.bat
+# 依次启动: Server :8080 -> Frontend :5173 -> ngrok
+\end{lstlisting}
+
+\textbf{手动启动}：
+\begin{lstlisting}[language=bash, basicstyle=\ttfamily\small]
+# Terminal 1 - Game Server
+cd server && npm run dev    # WebSocket :8080
+
+# Terminal 2 - Frontend
+cd frontend && npm run dev  # Vite :5173
+
+# Terminal 3 - ngrok (optional)
+ngrok http 8080
+\end{lstlisting}
+
+
+\subsection{Testing}
+
+测试房间 \texttt{8888} 常驻运行，自动在状态异常时重建。
+满 4 人且全部 ready 后 0.8 秒自动开局（create\_room 满员则 1.5 秒延迟开局）。
+
+
+% ===================================================================
+\section*{Code Availability}
+\addcontentsline{toc}{section}{Code Availability}
+
+本项目完全开源，代码仓库：
+\url{https://github.com/JaijaiC/TJMJ}
+
+欢迎 Fork / Star / Pull Request。
+
+
+% ===================================================================
+\section*{Disclaimer}
+\addcontentsline{toc}{section}{Disclaimer}
+
+本项目为个人娱乐学习用途，不涉及任何商业行为。
+所有规则及实现仅供参考，实际游玩请以当地线下规则为准。
+因使用本软件产生的任何争议或损失，开发者不承担相关责任。
+
+
+% ===================================================================
+\section*{Acknowledgments}
+\addcontentsline{toc}{section}{Acknowledgments}
+
+感谢湖南桃江的家人朋友提供规则校验与测试反馈；感谢开源社区
+(Vue.js, Node.js, Vite) 提供的优秀工具链。
+
+参考项目：
+\begin{itemize}[nosep]
+  \item OpenMajiang (\url{https://gitee.com/mirrors/OpenMajiang})
+  \item 武汉麻将在线 (\url{http://cdn0001.afrxvk.cn/whmj/go.html})
+\end{itemize}
+
+
+% ===================================================================
+%  Reference-style footer
+% ===================================================================
+\vfill
+\begin{center}
+\rule{\linewidth}{0.4pt}
+{\small\textit{TJMJ v1.0 -- Technical Manual -- \today}}\\[2pt]
+{\tiny 桃江经典王麻将\,\,|\, Taojiang Classic Wang Mahjong}\\[2pt]
+{\tiny \copyright\ 2024--2026 JaiJaiC. All rights reserved. 仅供个人娱乐学习使用。}
+\end{center}
+
+\end{document}

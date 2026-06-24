@@ -12,7 +12,7 @@
       <div class="mahjong-desk" :class="{ 'in-menu': isInMenu }">
 
         <!-- 左上角刷新按钮（仅在游戏中显示） -->
-        <button class="refresh-btn" v-if="!isInMenu" @click="safeRefresh" title="刷新对局">↻</button>
+        <button class="refresh-btn" v-if="!isInMenu && gameMode === 'multi'" @click="safeRefresh" title="刷新房间">↻</button>
 
         <!-- 控制按钮：游戏中显示全部 -->
         <div class="top-controls">
@@ -422,14 +422,17 @@ let _micCtx = null; // 仅麦克风使用
 
 const playSong = (filename) => {
   const audio = bgMusic.value;
-  if (!audio) return;
-  audio.src = `/TJMJ/${encodeURI(filename)}`;
+  if (!audio) { console.error('[BGM] playSong: audio 为 null'); return; }
+  const url = `/TJMJ/${encodeURI(filename)}`;
+  console.log('[BGM] playSong:', url);
+  audio.src = url;
   audio.volume = 0.65;
   audio.load();
   audio.play().then(() => {
     musicPlaying.value = true;
+    console.log('[BGM] 播放成功');
   }).catch((e) => {
-    console.log('BGM播放失败:', e);
+    console.error('[BGM] 播放失败:', e.message, e.name);
   });
 };
 
@@ -494,16 +497,18 @@ const stopMusic = () => {
 
 const toggleMusic = () => {
   const audio = bgMusic.value;
-  if (!audio) return;
+  console.log('[BGM] toggleMusic 调用, audio=', !!audio, 'musicPlaying=', musicPlaying.value, 'playlist=', currentPlaylist.value);
+  if (!audio) { console.error('[BGM] audio 元素为 null!'); return; }
   if (musicPlaying.value) {
     audio.pause();
     musicPlaying.value = false;
   } else {
-    // 直接播放，跳过 playRandomFrom 中间层
     if (currentPlaylist.value === 'home') {
+      console.log('[BGM] 播放首页歌曲:', HOME_SONGS[homeSongIdx]);
       playSong(HOME_SONGS[homeSongIdx]);
     } else {
       gameQueue = shuffle(getGameSongs());
+      console.log('[BGM] 播放游戏歌曲:', gameQueue[0]);
       playSong(gameQueue[0]);
     }
   }
@@ -2192,8 +2197,8 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .showdown-name { font-size: 13px; font-weight: bold; min-width: 40px; }
 .showdown-tiles { display: flex; gap: 2px; flex-wrap: wrap; flex: 1; }
 .showdown-tile-wrapper { position: relative; width: 22px; height: 32px; display: inline-block; margin-right: 1px; }
-.showdown-tile-bg { position: absolute; top: 0; left: 28px; width: 24px; height: 34px; }
-.showdown-tile-face { position: absolute; top: 1px; left: 30px; width: 20px; height: 30px; }
+.showdown-tile-bg { position: absolute; top: 0; left: 3px; width: 24px; height: 34px; }
+.showdown-tile-face { position: absolute; top: 1px; left: 5px; width: 20px; height: 30px; }
 
 /* showdown 赢家行高亮 */
 .showdown-row.winner-row { background: rgba(255,215,0,0.2); border-radius: 8px; padding: 4px 8px; }
