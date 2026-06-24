@@ -105,7 +105,7 @@
             <button class="lobby-btn create" @click="createRoom" :disabled="multiState.creating">
               {{ multiState.creating ? '创建中...' : '创建房间' }}
             </button>
-            <input v-model="multiState.joinInput" placeholder="输入4位房间号加入" class="lobby-input room-code" maxlength="4" @keyup="onJoinKeyup" />
+            <input v-model="multiState.joinInput" placeholder="输入4位房间号加入" class="lobby-input room-code" maxlength="4" @keyup="onJoinKeyup" autocomplete="off" />
             <button class="lobby-btn join" @click="joinRoom" :disabled="multiState.joining || multiState.joinInput.length !== 4">
               {{ multiState.joining ? '加入中...' : '加入房间' }}
             </button>
@@ -575,6 +575,12 @@ watch(() => gameState.handTiles.length, (newLen) => {
     handTileIds.push(++_tileIdCounter);
   }
 });
+// DEBUG：检测手牌被意外覆盖
+watch(() => [...gameState.handTiles], (after, before) => {
+  if (before && before.length > 0 && JSON.stringify(before) !== JSON.stringify(after)) {
+    console.trace('[DEBUG] handTiles 变化:', before.join(','), '→', after.join(','));
+  }
+});
 
 // 昵称记忆 & 随机
 const showMemory = ref(false);
@@ -601,8 +607,9 @@ const openEmojiPicker = (playerIndex) => {
     switchSpectateView(playerIndex);
     return;
   }
-  // 点击自己的头像 → 打开头像选择器
-  if (playerIndex === 0) {
+  // 点击自己的头像 → 打开头像选择器（联机用 netState.playerIndex，单机固定 0）
+  const myIdx = gameMode.value === 'multi' ? netState.playerIndex : 0;
+  if (playerIndex === myIdx) {
     showAvatarPicker.value = !showAvatarPicker.value;
     emojiPicker.target = null;
     return;
@@ -619,7 +626,8 @@ const loadCustomAvatar = (e) => {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = () => {
-    gameState.players[0].avatar = reader.result; // base64 data URL
+    const myIdx = gameMode.value === 'multi' ? netState.playerIndex : 0;
+    gameState.players[myIdx].avatar = reader.result;
     localStorage.setItem('tjmj_avatar', reader.result);
     showAvatarPicker.value = false;
   };
@@ -627,14 +635,17 @@ const loadCustomAvatar = (e) => {
 };
 const selectPresetAvatar = (num) => {
   const key = `${num}.表情包`;
-  gameState.players[0].avatar = key;
+  const myIdx = gameMode.value === 'multi' ? netState.playerIndex : 0;
+  gameState.players[myIdx].avatar = key;
   localStorage.setItem('tjmj_avatar', key);
   showAvatarPicker.value = false;
 };
-// 初始化时从 localStorage 恢复头像
 const restoreAvatar = () => {
   const saved = localStorage.getItem('tjmj_avatar');
-  if (saved) gameState.players[0].avatar = saved;
+  if (saved) {
+    const myIdx = gameMode.value === 'multi' ? netState.playerIndex : 0;
+    gameState.players[myIdx].avatar = saved;
+  }
 };
 // 拍照（调用相机）
 const takePhoto = () => {
@@ -2423,7 +2434,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .avatar-img.clickable:hover { transform: scale(1.15); filter: brightness(1.2); transition: 0.2s; }
 
 /* 头像选择器 */
-.avatar-picker-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; height: 100dvh; background: rgba(0,0,0,0.85); z-index: 9999999; display: flex; align-items: center; justify-content: center; }
+.avatar-picker-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; height: 100dvh; background: rgba(0,0,0,0.3); z-index: 9999999; display: flex; align-items: center; justify-content: center; }
 .avatar-picker-panel { background: #1a1a2e; border: 2px solid #ffd700; border-radius: 12px; padding: 20px; text-align: center; max-width: 360px; width: 90vw; }
 .avatar-picker-panel h3 { color: #ffd700; margin: 0 0 14px; font-size: 16px; }
 .avatar-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
