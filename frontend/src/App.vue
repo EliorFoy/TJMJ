@@ -13,7 +13,7 @@
 
         <!-- 左上角刷新按钮（仅在游戏中显示） -->
         <button class="refresh-btn" v-if="!isInMenu && gameMode === 'multi'" @click="safeRefresh" title="刷新房间">↻</button>
-        <span class="net-signal" v-if="!isInMenu && gameMode === 'multi'" :title="'延迟: ' + netLatency.ms + 'ms'">
+        <span class="net-signal" v-if="!isInMenu && gameMode === 'multi' && netLatency.level > 0" :title="netLatency.ms + 'ms'">
           <span v-for="n in 4" :key="n" class="net-bar" :class="{ active: netLatency.level >= n }"></span>
         </span>
 
