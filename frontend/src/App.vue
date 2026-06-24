@@ -210,7 +210,7 @@
                </div>
             </div>
 
-            <div v-for="(tile, index) in gameState.handTiles" :key="index" class="hand-tile-wrapper" :class="{ 'selected': gameState.selectedTileIndex === index, 'new-drawn-tile': isNewDrawnTile(index), 'dragging': dragIndex === index, 'drag-over': dragOverIndex === index }" draggable="true" @click="onTapTile(index)" @dragstart="onDragStart(index, $event)" @dragover.prevent="onDragOver(index)" @dragleave="onDragLeave(index)" @drop="onDrop(index)" @dragend="onDragEnd" @touchstart="onTouchStart(index, $event)" @touchmove.prevent="onTouchMove($event)" @touchend.prevent="onTouchEnd(index)">
+            <div v-for="(tile, index) in gameState.handTiles" :key="getStableTileKey(index, tile)" class="hand-tile-wrapper" :class="{ 'selected': gameState.selectedTileIndex === index, 'new-drawn-tile': isNewDrawnTile(index), 'dragging': dragIndex === index, 'drag-over': dragOverIndex === index }" draggable="true" @click="onTapTile(index)" @dragstart="onDragStart(index, $event)" @dragover.prevent="onDragOver(index)" @dragleave="onDragLeave(index)" @drop="onDrop(index)" @dragend="onDragEnd" @touchstart="onTouchStart(index, $event)" @touchmove.prevent="onTouchMove($event)" @touchend.prevent="onTouchEnd(index)">
               <img :src="getImg('3d/hand_1.png')" class="tile-bg" />
               <img :src="getImg(`tiles/${tile}.png`)" class="tile-face" />
             </div>
@@ -545,6 +545,21 @@ const multiState = reactive({
 });
 const dragIndex = ref(-1);    // 正在被拖拽的牌的索引
 const dragOverIndex = ref(-1); // 拖拽悬停的目标索引
+
+// 手牌稳定 key：watch 自动同步，防止拖拽后 VNode 重排导致自动归位
+const handTileIds = reactive([]);
+let _tileIdCounter = 0;
+const getStableTileKey = (index) => {
+  while (handTileIds.length <= index) handTileIds.push(++_tileIdCounter);
+  return `h${handTileIds[index]}`;
+};
+watch(() => gameState.handTiles.length, (newLen) => {
+  if (handTileIds.length > newLen) handTileIds.splice(newLen);
+  while (handTileIds.length < gameState.handTiles.length) {
+    const idx = handTileIds.length;
+    handTileIds.push(++_tileIdCounter);
+  }
+});
 
 // 昵称记忆 & 随机
 const showMemory = ref(false);
@@ -2197,8 +2212,8 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .showdown-name { font-size: 13px; font-weight: bold; min-width: 40px; }
 .showdown-tiles { display: flex; gap: 2px; flex-wrap: wrap; flex: 1; }
 .showdown-tile-wrapper { position: relative; width: 22px; height: 32px; display: inline-block; margin-right: 1px; }
-.showdown-tile-bg { position: absolute; top: 0; left: 3px; width: 24px; height: 34px; }
-.showdown-tile-face { position: absolute; top: 1px; left: 5px; width: 20px; height: 30px; }
+.showdown-tile-bg { position: absolute; top: 0; left: -7px; width: 24px; height: 34px; }
+.showdown-tile-face { position: absolute; top: 1px; left: -5px; width: 20px; height: 30px; }
 
 /* showdown 赢家行高亮 */
 .showdown-row.winner-row { background: rgba(255,215,0,0.2); border-radius: 8px; padding: 4px 8px; }

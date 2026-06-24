@@ -4,9 +4,6 @@
 # Local tools (ngrok etc.)
 other/
 
-# Large media files (deploy separately)
-frontend/public/docs/showcase.mp4
-
 # LaTeX auxiliary files
 *.aux
 *.log
