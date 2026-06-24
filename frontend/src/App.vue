@@ -294,22 +294,6 @@
           </div>
         </div>
 
-        <!-- 头像选择器 -->
-        <div class="avatar-picker-overlay" v-if="showAvatarPicker" @click.self="showAvatarPicker = false">
-          <div class="avatar-picker-panel">
-            <h3>选择头像</h3>
-            <div class="avatar-grid">
-              <img v-for="n in 12" :key="'av'+n" :src="getImg(`avatars/${n}.表情包.png`)" class="avatar-option" @click="selectPresetAvatar(n)" />
-            </div>
-            <div class="avatar-picker-actions">
-              <button class="avatar-action-btn" @click="takePhoto">📷 拍照</button>
-              <button class="avatar-action-btn" @click="avatarFileInput?.click()">📁 选择图片</button>
-              <button class="avatar-action-btn cancel" @click="showAvatarPicker = false">取消</button>
-            </div>
-            <input ref="avatarFileInput" type="file" accept="image/*" style="display:none" @change="loadCustomAvatar" />
-          </div>
-        </div>
-
         <!-- 表情选择器 -->
         <div class="emoji-picker" v-if="emojiPicker.target !== null" v-show="gameState.gamePhase === 'PLAYING'">
           <span v-for="e in emojis" :key="e.icon" class="emoji-option" @click="sendEmoji(e.icon)">{{ e.icon }}</span>
@@ -365,6 +349,22 @@
             <p>开发者保留随时更新本协议的权利，更新后的协议将在本页面公布即生效。</p>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- 头像选择器——game-wrapper 外层 -->
+    <div class="avatar-picker-overlay" v-if="showAvatarPicker" @click.self="showAvatarPicker = false">
+      <div class="avatar-picker-panel">
+        <h3>选择头像</h3>
+        <div class="avatar-grid">
+          <img v-for="n in 12" :key="'av'+n" :src="getImg(`avatars/${n}.表情包.png`)" class="avatar-option" @click="selectPresetAvatar(n)" />
+        </div>
+        <div class="avatar-picker-actions">
+          <button class="avatar-action-btn" @click="takePhoto">📷 拍照</button>
+          <button class="avatar-action-btn" @click="avatarFileInput?.click()">📁 图片</button>
+          <button class="avatar-action-btn cancel" @click="showAvatarPicker = false">取消</button>
+        </div>
+        <input ref="avatarFileInput" type="file" accept="image/*" style="display:none" @change="loadCustomAvatar" />
       </div>
     </div>
   </div>
@@ -2455,13 +2455,13 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 
 /* 头像选择器 */
 .avatar-picker-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; height: 100dvh; background: rgba(0,0,0,0.3); z-index: 9999999; display: flex; align-items: center; justify-content: center; }
-.avatar-picker-panel { background: #1a1a2e; border: 2px solid #ffd700; border-radius: 12px; padding: 20px; text-align: center; max-width: 360px; width: 90vw; margin: auto; }
-.avatar-picker-panel h3 { color: #ffd700; margin: 0 0 14px; font-size: 16px; }
-.avatar-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 14px; }
-.avatar-option { width: 100%; aspect-ratio: 1; border-radius: 10px; border: 2px solid #444; cursor: pointer; background: #fff; object-fit: cover; transition: 0.15s; }
+.avatar-picker-panel { background: #1a1a2e; border: 2px solid #ffd700; border-radius: 10px; padding: 14px; text-align: center; max-width: 240px; width: 80vw; margin: auto; }
+.avatar-picker-panel h3 { color: #ffd700; margin: 0 0 8px; font-size: 14px; }
+.avatar-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 10px; }
+.avatar-option { width: 100%; aspect-ratio: 1; border-radius: 8px; border: 2px solid #444; cursor: pointer; background: #fff; object-fit: cover; transition: 0.15s; }
 .avatar-option:hover { border-color: #ffd700; transform: scale(1.08); }
-.avatar-picker-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
-.avatar-action-btn { background: rgba(255,255,255,0.1); border: 1px solid #555; border-radius: 8px; color: #ddd; padding: 6px 14px; font-size: 13px; cursor: pointer; transition: 0.15s; }
+.avatar-picker-actions { display: flex; gap: 5px; justify-content: center; flex-wrap: wrap; }
+.avatar-action-btn { background: rgba(255,255,255,0.1); border: 1px solid #555; border-radius: 6px; color: #ddd; padding: 4px 10px; font-size: 12px; cursor: pointer; transition: 0.15s; }
 .avatar-action-btn:hover { background: #ffd700; color: #1a1a2e; border-color: #ffd700; }
 .avatar-action-btn.cancel { border-color: #666; color: #888; }
 .avatar-action-btn.cancel:hover { background: #444; color: #ccc; border-color: #888; }
