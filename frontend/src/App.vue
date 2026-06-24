@@ -422,17 +422,14 @@ let _micCtx = null; // 仅麦克风使用
 
 const playSong = (filename) => {
   const audio = bgMusic.value;
-  if (!audio) { console.error('[BGM] playSong: audio 为 null'); return; }
-  const url = `/TJMJ/${encodeURI(filename)}`;
-  console.log('[BGM] playSong:', url);
-  audio.src = url;
+  if (!audio) return;
+  audio.src = `/TJMJ/${encodeURI(filename)}`;
   audio.volume = 0.65;
   audio.load();
   audio.play().then(() => {
     musicPlaying.value = true;
-    console.log('[BGM] 播放成功');
   }).catch((e) => {
-    console.error('[BGM] 播放失败:', e.message, e.name);
+    console.log('BGM播放失败:', e);
   });
 };
 
@@ -497,18 +494,15 @@ const stopMusic = () => {
 
 const toggleMusic = () => {
   const audio = bgMusic.value;
-  console.log('[BGM] toggleMusic 调用, audio=', !!audio, 'musicPlaying=', musicPlaying.value, 'playlist=', currentPlaylist.value);
-  if (!audio) { console.error('[BGM] audio 元素为 null!'); return; }
+  if (!audio) return;
   if (musicPlaying.value) {
     audio.pause();
     musicPlaying.value = false;
   } else {
     if (currentPlaylist.value === 'home') {
-      console.log('[BGM] 播放首页歌曲:', HOME_SONGS[homeSongIdx]);
       playSong(HOME_SONGS[homeSongIdx]);
     } else {
       gameQueue = shuffle(getGameSongs());
-      console.log('[BGM] 播放游戏歌曲:', gameQueue[0]);
       playSong(gameQueue[0]);
     }
   }
@@ -1537,13 +1531,15 @@ const onDragStart = (index, e) => {
 const onDragOver = (index) => {
   if (dragIndex.value === -1 || dragIndex.value === index) return;
   dragOverIndex.value = index;
-  // 实时交换
   const tiles = gameState.handTiles;
   const dragged = tiles[dragIndex.value];
   tiles.splice(dragIndex.value, 1);
   tiles.splice(index, 0, dragged);
+  // 同步稳定 ID 数组
+  const draggedId = handTileIds[dragIndex.value];
+  handTileIds.splice(dragIndex.value, 1);
+  handTileIds.splice(index, 0, draggedId);
   dragIndex.value = index;
-  // 同步更新选中索引
   if (gameState.selectedTileIndex === dragIndex.value) gameState.selectedTileIndex = index;
 };
 
@@ -1593,6 +1589,9 @@ const onTouchMove = (e) => {
     const dragged = tilesArr[dragIndex.value];
     tilesArr.splice(dragIndex.value, 1);
     tilesArr.splice(target, 0, dragged);
+    const draggedId = handTileIds[dragIndex.value];
+    handTileIds.splice(dragIndex.value, 1);
+    handTileIds.splice(target, 0, draggedId);
     dragIndex.value = target;
     if (gameState.selectedTileIndex === dragIndex.value) gameState.selectedTileIndex = target;
   }
@@ -1609,7 +1608,8 @@ const onTouchEnd = (index) => {
 const playTile = (index) => {
   const val = gameState.handTiles[index];
   gameState.handTiles.splice(index, 1);
-  gameState.handTiles.sort((a, b) => a - b);
+  handTileIds.splice(index, 1); // 同步稳定ID
+  // 不排序，保留玩家手动拖拽的顺序
   gameState.selectedTileIndex = -1;
   clearTimeout(turnTimer);
   playDong();
@@ -1668,21 +1668,29 @@ const handleTileDiscarded = (sourceIndex, targetTile) => {
     }
   }
 
-  if (intercepts.hu.length > 0) {
-    if (intercepts.hu.includes(0)) return promptPlayerAction(sourceIndex, targetTile, { canHu: true });
-    else return executeNpcAction(intercepts.hu[0], 'hu', targetTile, sourceIndex);
+  // 先处理 NPC 拦截（hu > gang > peng > chi 优先级）
+  if (intercepts.hu.filter(i => i !== 0).length > 0) {
+    return executeNpcAction(intercepts.hu.find(i => i !== 0), 'hu', targetTile, sourceIndex);
   }
-  if (intercepts.gang.length > 0) {
-    if (intercepts.gang.includes(0)) return promptPlayerAction(sourceIndex, targetTile, { canGang: true });
-    else return executeNpcAction(intercepts.gang[0], 'gang', targetTile, sourceIndex);
+  if (intercepts.gang.filter(i => i !== 0).length > 0) {
+    return executeNpcAction(intercepts.gang.find(i => i !== 0), 'gang', targetTile, sourceIndex);
   }
-  if (intercepts.peng.length > 0) {
-    if (intercepts.peng.includes(0)) return promptPlayerAction(sourceIndex, targetTile, { canPeng: true });
-    else return executeNpcAction(intercepts.peng[0], 'peng', targetTile, sourceIndex);
+  if (intercepts.peng.filter(i => i !== 0).length > 0) {
+    return executeNpcAction(intercepts.peng.find(i => i !== 0), 'peng', targetTile, sourceIndex);
   }
-  if (intercepts.chi.length > 0) {
-    if (intercepts.chi.includes(0)) return promptPlayerAction(sourceIndex, targetTile, { canChi: true });
-    else return executeNpcAction(intercepts.chi[0], 'chi', targetTile, sourceIndex);
+  if (intercepts.chi.filter(i => i !== 0).length > 0) {
+    return executeNpcAction(intercepts.chi.find(i => i !== 0), 'chi', targetTile, sourceIndex);
+  }
+
+  // 玩家：所有可选操作同时亮起
+  if (intercepts.hu.includes(0) || intercepts.gang.includes(0) || intercepts.peng.includes(0) || intercepts.chi.includes(0)) {
+    const actions = {
+      canHu: intercepts.hu.includes(0),
+      canGang: intercepts.gang.includes(0),
+      canPeng: intercepts.peng.includes(0),
+      canChi: intercepts.chi.includes(0),
+    };
+    return promptPlayerAction(sourceIndex, targetTile, actions);
   }
 
   nextTurn();
@@ -1761,7 +1769,11 @@ const handlePeng = () => {
     actionState.isWaiting = false;
     return;
   }
-  for(let i=0; i<2; i++) gameState.handTiles.splice(gameState.handTiles.indexOf(target), 1);
+  for(let i=0; i<2; i++) {
+    const idx = gameState.handTiles.indexOf(target);
+    gameState.handTiles.splice(idx, 1);
+    handTileIds.splice(idx, 1);
+  }
   gameState.discards.pop();
   gameState.exposed[0].push({ type: 'peng', tiles: [target, target, target] });
   actionState.isWaiting = false;
@@ -1782,7 +1794,11 @@ const handleChiWithCombo = (combo) => {
     return;
   }
   const target = actionState.targetTile;
-  combo.forEach(t => gameState.handTiles.splice(gameState.handTiles.indexOf(t), 1));
+  combo.forEach(t => {
+    const idx = gameState.handTiles.indexOf(t);
+    gameState.handTiles.splice(idx, 1);
+    handTileIds.splice(idx, 1);
+  });
   gameState.discards.pop();
   gameState.exposed[0].push({ type: 'chi', tiles: [combo[0], target, combo[1]].sort((a,b)=>a-b) });
   actionState.isWaiting = false;
@@ -2212,8 +2228,8 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .showdown-name { font-size: 13px; font-weight: bold; min-width: 40px; }
 .showdown-tiles { display: flex; gap: 2px; flex-wrap: wrap; flex: 1; }
 .showdown-tile-wrapper { position: relative; width: 22px; height: 32px; display: inline-block; margin-right: 1px; }
-.showdown-tile-bg { position: absolute; top: 0; left: -7px; width: 24px; height: 34px; }
-.showdown-tile-face { position: absolute; top: 1px; left: -5px; width: 20px; height: 30px; }
+.showdown-tile-bg { position: absolute; top: 0; left: 18px; width: 24px; height: 34px; }
+.showdown-tile-face { position: absolute; top: 1px; left: 20px; width: 20px; height: 30px; }
 
 /* showdown 赢家行高亮 */
 .showdown-row.winner-row { background: rgba(255,215,0,0.2); border-radius: 8px; padding: 4px 8px; }
