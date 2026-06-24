@@ -63,7 +63,7 @@
             <button class="mode-btn" @click="enterGame('spectate')">观战模式</button>
             <button class="mode-btn test-mode-btn" @click="enterGame('test')" disabled title="其他玩法暂未开放">其他玩法</button>
             <div class="info-links">
-              <a class="info-link" :href="`${BASE}docs/TJMJ_Technical_Manual.pdf`" target="_blank">教程文档</a>
+              <a class="info-link" :href="`${BASE}docs/TJMJ_Technical_Manual_CN.pdf`" target="_blank">教程文档</a>
               <a class="info-link" @click="openInfo('video')">演示视频</a>
               <a class="info-link" @click="openInfo('disclaimer')">使用协议</a>
             </div>
@@ -328,7 +328,7 @@
         <button class="info-close" @click="closeInfo">✕</button>
         <div v-if="infoOverlay === 'manual'" class="info-text" style="text-align:center;display:flex;align-items:center;justify-content:center;flex-direction:column;">
           <p style="font-size:16px;color:#ddd;">点击下方按钮在新标签页中查看高清文档</p>
-          <a :href="`${BASE}docs/TJMJ_Technical_Manual.pdf`" target="_blank" class="info-link" style="font-size:18px;color:#ffd700;margin-top:16px;">📄 打开教程文档</a>
+          <a :href="`${BASE}docs/TJMJ_Technical_Manual_CN.pdf`" target="_blank" class="info-link" style="font-size:18px;color:#ffd700;margin-top:16px;">📄 打开教程文档</a>
         </div>
         <div v-if="infoOverlay === 'video'" class="info-video-wrap">
           <video :src="`${BASE}docs/showcase.mp4`" controls class="info-video" controlsList="nodownload nofullscreen" disableRemotePlayback crossorigin="anonymous" playsinline></video>
