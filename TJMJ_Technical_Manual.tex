@@ -1,28 +1,5 @@
 % ===========================================================================
-%  TJMJ — 桃江经典王麻将  技术手册 / 开发文档
-%  Nature-style LaTeX manuscript
-%  Compile: xelatex TJMJ_Technical_Manual.tex (requires XeLaTeX + Chinese fonts)
-% ===========================================================================
-\documentclass[11pt,a4paper]{article}
-
-% ---------- Font & encoding ----------
-\usepackage[UTF8]{ctex}          % 中文支持 (XeLaTeX 编译)
-\usepackage{fontspec}
-\setmainfont{Times New Roman}
-\setCJKmainfont{SimSun}[BoldFont=SimHei,ItalicFont=KaiTi]
-\setCJKmonofont{FangSong}   % CJK monospace (listings 等用)
-\usepackage[scaled]{helvet}
-% courier 字体某些变体不可用, 用 Latin Modern Mono 替代
-\renewcommand{\ttdefault}{lmtt}
-
-% ---------- Page layout ----------
-\usepackage{geometry}
-\geometry{top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm}
-\usepackage{fancyhdr}
-\pagestyle{fancy}
-\fancyhf{}
-\fancyhead[L]{\small\textit{TJMJ Technical Manual}}
-\fancyhead[R]{\small\thepage}
+%
 \renewcommand{\headrulewidth}{0.4pt}
 
 % ---------- Scientific packages ----------

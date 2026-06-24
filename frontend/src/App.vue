@@ -285,7 +285,9 @@
                 {{ p.name }}: {{ p.score >= 0 ? '+' : '' }}{{ p.score }}
               </span>
             </div>
-            <button class="btn-ready" @click="startNextRoundFromShowdown">{{ gameState.roundNumber >= 16 ? '🏆 查看最终排名' : '▶ 下一局' }}</button>
+            <button class="btn-ready" @click="startNextRoundFromShowdown">
+              {{ gameMode === 'multi' ? `✓ 确认继续 (${readyNextCount}/4)` : gameState.roundNumber >= 16 ? '🏆 查看最终排名' : '▶ 下一局' }}
+            </button>
           </div>
         </div>
 
@@ -1373,11 +1375,19 @@ const setupNetworkListeners = () => {
     actionState.isWaiting = false;
   });
 
+  // 多人确认进度
+  const readyNextCount = ref(0);
   on('round_end', (msg) => {
-    gameState.gamePhase = 'WAITING';
+    gameState.gamePhase = 'SETTLEMENT';
     gameState.showdownHands = msg.hands;
-    gameState.players.forEach((p, i) => { p.score = msg.totalScores?.[i] || 0; });
+    readyNextCount.value = 0;
+    if (msg.scores) msg.scores.forEach((s, i) => { gameState.players[i].score = s; });
+    if (msg.totalScores) gameState.players.forEach((p, i) => { p.score = msg.totalScores[i] || 0; });
     gameState.roundNumber = msg.roundNumber;
+    lastWinnerIdx.value = msg.winnerIndex >= 0 ? msg.winnerIndex : lastWinnerIdx.value;
+  });
+  on('player_ready_next', (msg) => {
+    readyNextCount.value = msg.ready.filter(r => r).length;
   });
 
   on('emoji_from', (msg) => {
@@ -1461,6 +1471,10 @@ const nextRoundOrFinish = () => {
 };
 
 const startNextRoundFromShowdown = () => {
+  if (gameMode.value === 'multi') {
+    send({ type: 'ready_next' });
+    return; // 等服务器通知新局开始
+  }
   if (gameState.roundNumber >= 16) {
     nextRoundOrFinish();
     return;
@@ -2320,8 +2334,8 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .showdown-name { font-size: 13px; font-weight: bold; min-width: 40px; }
 .showdown-tiles { display: flex; gap: 2px; flex-wrap: wrap; flex: 1; }
 .showdown-tile-wrapper { position: relative; width: 22px; height: 32px; display: inline-block; margin-right: 1px; }
-.showdown-tile-bg { position: absolute; top: 0; left: 18px; width: 24px; height: 34px; }
-.showdown-tile-face { position: absolute; top: 1px; left: 20px; width: 20px; height: 30px; }
+.showdown-tile-bg { position: absolute; top: 0; left: 23px; width: 24px; height: 34px; }
+.showdown-tile-face { position: absolute; top: 1px; left: 25px; width: 20px; height: 30px; }
 
 /* showdown 赢家行高亮 */
 .showdown-row.winner-row { background: rgba(255,215,0,0.2); border-radius: 8px; padding: 4px 8px; }

@@ -141,7 +141,7 @@ export class GameRoom {
       if (i === 52) player = 0;
       this.hands[player].push(tile);
     }
-    this.hands.forEach(h => h.sort((a, b) => a - b));
+    // 不排序，保留发牌顺序（玩家可拖拽自定义排列）
     this.currentPlayerIndex = 0;
 
     // 通知每个人他的牌和王
@@ -204,9 +204,7 @@ export class GameRoom {
       return;
     }
     const tile = this.physicalDraw();
-    this.hands[playerIndex].push(tile);
-    this.hands[playerIndex].sort((a, b) => a - b);
-
+    this.hands[playerIndex].push(tile); // 不排序，保留玩家自定义顺序
     this.sendTo(playerIndex, { type: 'drew_tile', tile });
     this.broadcastPublic();
 
@@ -411,27 +409,43 @@ export class GameRoom {
 
   endRound(winnerIndex) {
     this.state = 'SETTLEMENT';
-    // winnerIndex === -1 表示流局
+    // 赢家坐庄，流局轮转
+    if (winnerIndex >= 0) {
+      this.dealerIndex = winnerIndex;
+    } else {
+      this.dealerIndex = (this.dealerIndex + 1) % 4;
+    }
+    // 分数结算（简单版：赢家 +1 分）
+    if (winnerIndex >= 0) {
+      this.totalScores[winnerIndex] += 1;
+      this.players[winnerIndex].score += 1;
+    }
     this.broadcast({
       type: 'round_end',
       winnerIndex,
       hands: this.hands,
       totalScores: this.totalScores,
       roundNumber: this.roundNumber,
+      scores: this.players.map(p => p.score),
     });
+    // 等待玩家点击"继续"（不再自动开始）
+  }
 
-    // 自动下一局
-    setTimeout(() => {
-      if (this.roundNumber >= 4) {
+  // 玩家确认继续（联机模式四人全部确认后开新局）
+  playerReadyForNext(playerIndex) {
+    if (this.state !== 'SETTLEMENT') return;
+    this.players[playerIndex].ready = true;
+    this.broadcast({ type: 'player_ready_next', playerIndex, ready: this.players.map(p => p.ready) });
+    if (this.players.length === 4 && this.players.every(p => p.ready)) {
+      if (this.roundNumber >= 16) {
         this.broadcast({ type: 'game_end', totalScores: this.totalScores, players: this.playersInfo() });
         this.state = 'LOBBY';
-        this.players = [];  // 清空玩家，准备下一轮测试
         return;
       }
       this.roundNumber++;
-      this.dealerIndex = (this.dealerIndex + 1) % 4;
+      this.players.forEach(p => p.ready = false);
       this.startGame();
-    }, 5000);
+    }
   }
 
   // === 状态广播 ===

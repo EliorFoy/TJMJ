@@ -148,6 +148,14 @@ wss.on('connection', (ws) => {
         break;
       }
 
+      // 玩家确认继续（4人全部确认后开始新局）
+      case 'ready_next': {
+        if (myRoom && myPlayerIndex >= 0) {
+          myRoom.playerReadyForNext(myPlayerIndex);
+        }
+        break;
+      }
+
       // 心跳保活
       case 'ping': {
         try { ws.send(JSON.stringify({ type: 'pong' })); } catch(e) {}
