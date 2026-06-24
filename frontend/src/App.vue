@@ -1327,15 +1327,12 @@ const setupNetworkListeners = () => {
     gameState.deckRemaining = msg.deckRemaining;
     gameState.wallTiles = msg.wallTiles || [];
     gameState.npcTileCounts = msg.tileCounts || [13, 13, 13, 13];
-    // 同步服务端手牌（防15张等计数偏差）
-    if (msg.hand) gameState.handTiles = [...msg.hand];
     if (msg.hands) gameState.npcHands = msg.hands.map(h => [...h]);
-    // 没有待处理动作时重置按钮（由服务器控制，不自动超时）
-    // 观战模式：显示所有玩家手牌
+    // 观战模式：显示所有玩家手牌；普通模式：智能合并保留拖拽顺序
     if (gameMode.value === 'spectate' && msg.hands) {
       gameState.npcHands = msg.hands;
       gameState.handTiles = [...(msg.hands[spectateView.value] || [])];
-    } else {
+    } else if (gameMode.value === 'multi') {
       // 智能合并：保留客户端拖拽顺序，仅增删
       if (msg.hand && msg.hand.length > 0) {
         const oldTiles = [...gameState.handTiles];
