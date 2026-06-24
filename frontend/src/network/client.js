@@ -1,9 +1,8 @@
-// frontend/src/network/client.js — WebSocket 多人联机客户端
+// frontend/src/network/client.js — WebSocket 多人联机客户端（含断线重连）
 import { reactive } from 'vue';
 
 // 服务器地址
 const WS_URL = (() => {
-  // 本地开发用 localhost:8080，公网用 ngrok 地址（ngrok 仅接受 wss 加密连接）
   const isLocal = location.hostname === 'localhost';
   const protocol = isLocal ? 'ws:' : 'wss:';
   const host = isLocal ? 'localhost:8080' : 'synapse-squander-finale.ngrok-free.dev';
@@ -14,13 +13,19 @@ export const netState = reactive({
   connected: false,
   roomId: null,
   playerIndex: -1,
-  players: [],         // [{ id, name, avatar, score, connected }]
+  players: [],
   error: null,
 });
 
 let ws = null;
-let listeners = new Map(); // event → Set of callbacks
-let sendQueue = []; // 连接建立前的消息缓冲
+let listeners = new Map();
+let sendQueue = [];
+let reconnectTimer = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT = 8;
+let lastRoomId = null;
+let lastPlayerName = '';
+let lastAvatar = '';
 
 // 连接服务器
 export const connect = () => {
@@ -40,7 +45,7 @@ export const connect = () => {
     ws.onopen = () => {
       netState.connected = true;
       netState.error = null;
-      // 冲刷缓冲的消息
+      reconnectAttempts = 0;
       if (sendQueue.length > 0) {
         console.log('[client] 冲刷缓冲消息:', sendQueue.length, '条');
         sendQueue.forEach(m => ws.send(JSON.stringify(m)));
@@ -57,7 +62,12 @@ export const connect = () => {
 
     ws.onclose = () => {
       netState.connected = false;
-      emit('disconnected');
+      // 尝试自动重连（指数退避）
+      if (lastRoomId) {
+        scheduleReconnect();
+      } else {
+        emit('disconnected');
+      }
     };
 
     ws.onerror = () => {
@@ -66,8 +76,48 @@ export const connect = () => {
   });
 };
 
-// 断开连接
+// 断线重连（指数退避：1s → 2s → 4s → ... → 最大 128s）
+const scheduleReconnect = () => {
+  if (reconnectAttempts >= MAX_RECONNECT) {
+    console.log('[client] 重连失败，已达最大尝试次数');
+    emit('disconnected');
+    return;
+  }
+  const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 120000);
+  reconnectAttempts++;
+  console.log(`[client] ${delay/1000}s 后尝试第 ${reconnectAttempts} 次重连...`);
+  reconnectTimer = setTimeout(async () => {
+    try {
+      await connect();
+      // 重连成功后自动重新加入房间
+      if (lastRoomId && lastPlayerName) {
+        send({
+          type: 'join_room',
+          roomId: lastRoomId,
+          name: lastPlayerName,
+          avatar: lastAvatar,
+        });
+        console.log('[client] 重连成功，已重新加入房间', lastRoomId);
+      }
+      emit('reconnected');
+    } catch (e) {
+      scheduleReconnect();
+    }
+  }, delay);
+};
+
+// 记录当前房间信息（用于重连）
+export const setRoomInfo = (roomId, playerName, avatar) => {
+  lastRoomId = roomId;
+  lastPlayerName = playerName;
+  lastAvatar = avatar;
+};
+
+// 断开连接（主动断开，不重连）
 export const disconnect = () => {
+  lastRoomId = null;
+  if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+  reconnectAttempts = 0;
   if (ws) ws.close();
   ws = null;
   netState.connected = false;
@@ -75,7 +125,7 @@ export const disconnect = () => {
   netState.playerIndex = -1;
 };
 
-// 发送消息（游戏操作节流防崩溃，WebRTC信令不节流）
+// 发送消息
 const _lastSend = {};
 const _THROTTLE = 400;
 const _NO_THROTTLE = ['webrtc_offer', 'webrtc_answer', 'webrtc_ice', 'chat'];
@@ -93,11 +143,24 @@ export const send = (msg) => {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(msg));
   } else if (ws && ws.readyState === WebSocket.CONNECTING) {
-    // 连接中，缓冲消息
     sendQueue.push(msg);
   } else {
     console.error('[client] 无法发送! ws=', ws, 'readyState=', ws?.readyState);
   }
+};
+
+// 心跳（保持连接活跃，防 NAT 超时断开）
+let heartbeatTimer = null;
+const startHeartbeat = () => {
+  stopHeartbeat();
+  heartbeatTimer = setInterval(() => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      send({ type: 'ping' });
+    }
+  }, 25000); // 每 25 秒 ping 一次
+};
+const stopHeartbeat = () => {
+  if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
 };
 
 // 事件监听
@@ -123,10 +186,16 @@ const handleMessage = (msg) => {
     case 'room_joined':
       netState.roomId = msg.roomId;
       netState.playerIndex = msg.playerIndex;
+      setRoomInfo(msg.roomId, msg.name || lastPlayerName, msg.avatar || lastAvatar);
+      startHeartbeat();
       break;
 
     case 'room_players':
       netState.players = msg.players;
+      break;
+
+    case 'pong':
+      // 心跳回复，连接正常
       break;
 
     case 'error':

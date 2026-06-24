@@ -147,6 +147,12 @@ wss.on('connection', (ws) => {
         myRoom.sendTo(msg.to, { type: msg.type, from: myPlayerIndex, data: msg.data });
         break;
       }
+
+      // 心跳保活
+      case 'ping': {
+        try { ws.send(JSON.stringify({ type: 'pong' })); } catch(e) {}
+        break;
+      }
     }
   });
 

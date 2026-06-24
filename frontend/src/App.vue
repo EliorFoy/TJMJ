@@ -860,13 +860,17 @@ const rtcConfig = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
+    // 免费 TURN 服务器，手机 4G/5G NAT 穿透必备
+    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
   ]
 };
 
 // 启动音量监测
-const startMicLevelMonitor = (stream) => {
+const startMicLevelMonitor = async (stream) => {
   try {
-    if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    await _ensureAudioCtx();
     analyserNode = audioContext.createAnalyser();
     analyserNode.fftSize = 256;
     const source = audioContext.createMediaStreamSource(stream);
@@ -897,7 +901,10 @@ const toggleMic = async () => {
   } else {
     try {
       if (!localStream.value) {
-        localStream.value = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+        localStream.value = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          video: false
+        });
         startMicLevelMonitor(localStream.value);
       }
       localStream.value.getAudioTracks().forEach(t => t.enabled = true);
@@ -914,6 +921,11 @@ const toggleMic = async () => {
 
 const setupVoiceWithRoom = async () => {
   if (!localStream.value) return;
+  // 等待玩家列表抵达（防竞态）
+  if (!netState.players || netState.players.length < 2) {
+    setTimeout(() => setupVoiceWithRoom(), 800);
+    return;
+  }
   const myIdx = netState.playerIndex;
   myPlayerIndexForChat.value = myIdx;
   // 关闭旧连接重建（确保音频轨道正确添加）
@@ -1008,8 +1020,30 @@ const handleWebrtcSignal = (msg) => {
 };
 
 const closeAllPeerConnections = () => {
-  peerConnections.forEach(pc => pc.close());
+  peerConnections.forEach(pc => {
+    try { pc.close(); } catch(e) {}
+  });
   peerConnections.clear();
+  // 停止本地麦克风轨道，释放资源
+  if (localStream.value) {
+    localStream.value.getTracks().forEach(t => t.stop());
+    localStream.value = null;
+  }
+  // 暂停 AudioContext（iOS 要求）
+  if (audioContext) {
+    try { audioContext.suspend(); } catch(e) {}
+  }
+};
+
+// AudioContext 单例（iOS 需在用户手势后 resume）
+const _ensureAudioCtx = async () => {
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  if (audioContext.state === 'suspended') {
+    try { await audioContext.resume(); } catch(e) {}
+  }
+  return audioContext;
 };
 
 const spectateRoomInput = ref('');
@@ -1110,6 +1144,7 @@ const joinRoom = async () => {
 };
 
 const leaveRoom = () => {
+  closeAllPeerConnections();
   disconnect();
   netState.roomId = null;
 };
@@ -1264,9 +1299,17 @@ const setupNetworkListeners = () => {
   });
 
   on('disconnected', () => {
-    gameState.gamePhase = 'WAITING';
-    netState.roomId = null;
-    alert('与服务器断开连接');
+    // 重连已耗尽，才退出房间
+    if (gameState.gamePhase === 'PLAYING') {
+      gameState.gamePhase = 'WAITING';
+      netState.roomId = null;
+      closeAllPeerConnections();
+    }
+  });
+
+  on('reconnected', () => {
+    console.log('[联机] 已重新连接');
+    if (micEnabled.value) setTimeout(() => setupVoiceWithRoom(), 800);
   });
 
   // === 聊天消息 ===
