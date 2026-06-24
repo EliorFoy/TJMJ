@@ -13,15 +13,21 @@
 \fancyhead[L]{\small TJMJ 技术手册 (中文版)}
 \fancyhead[R]{\small\thepage}
 \renewcommand{\headrulewidth}{0.4pt}
-\setlength{\parskip}{3pt plus1pt minus1pt}
+\setlength{\parskip}{1pt plus0.5pt minus0.5pt}
+\renewcommand{\baselinestretch}{0.95}
+\usepackage[compact]{titlesec}
+\titlespacing{\section}{0pt}{6pt}{2pt}
+\titlespacing{\subsection}{0pt}{4pt}{1pt}
+\titlespacing{\subsubsection}{0pt}{3pt}{0pt}
 
 \usepackage{amsmath,amssymb,mathtools}
 \usepackage{graphicx}
 \usepackage[table]{xcolor}
 \usepackage{booktabs,array,multirow,tabularx,longtable}
 \usepackage{enumitem}
+\setlist{nosep,leftmargin=*}
 \usepackage{hyperref}
-\hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue}
+\hypersetup{colorlinks=true,linkcolor=blue,urlcolor=blue,citecolor=blue}
 \usepackage{float}
 \usepackage{caption,subcaption}
 \usepackage{listings}
@@ -37,27 +43,46 @@
   srv/.style={rectangle,draw,fill=orange!10,text width=2.5cm,minimum height=0.8cm,align=center,font=\footnotesize},
 }
 
-\title{\bfseries\LARGE 桃江经典王麻将 (TJMJ)\\[4pt]
-       全栈实时 Web 平台\\[2pt]
-       \large 技术研究报告}
-\author{JaiJaiC\\\small 湖南桃江\\\small\texttt{https://github.com/JaijaiC/TJMJ}}
+% --- 文档信息 ---
+\title{\bfseries\LARGE\color{blue!60!black} 桃江经典王麻将 (TJMJ)\\[4pt]
+       \large\color{blue!50!black} 全栈实时 Web 平台 — 技术研究报告}
+\author{%
+  \begin{tabular}{c}
+  \small\textbf{Jintian Xia}$^{1}$ \quad \textbf{Siyuan Liu}$^{1}$ \quad \textbf{Jianghong Xiang}$^{1}$ \quad \textbf{Zhuangwei Zeng}$^{1}$ \\
+  \small\textbf{Jian Hu}$^{1}$ \quad \textbf{Yangyang Song}$^{1}$ \quad \textbf{Hao Wen}$^{1}$ \quad \textbf{Xiaobing Yang}$^{1}$ \quad \textbf{Erma Li}$^{1}$ \\[4pt]
+  \small\textbf{Jaijai C}$^{1,\dagger}$ \\[2pt]
+  \small$^{1}$\textit{School of Entertainment Computing, TJMJ Lab, Taojiang, Hunan, China} \\
+  \small$\dagger$\textit{Corresponding author: }\texttt{jaijai.c@tjmj.dev} \\[2pt]
+  \small\texttt{\color{blue}https://github.com/JaijaiC/TJMJ}
+  \end{tabular}
+}
 \date{\today}
 
 \begin{document}
 \maketitle
 
+\vspace{-8pt}
 \begin{center}
-\rule{\linewidth}{1pt}\\[4pt]
+{\color{cyan!60!black}\rule{\linewidth}{1.5pt}}\\[2pt]
 \begin{minipage}{0.95\linewidth}
-\small\textbf{摘要}\quad
-本文系统阐述面向湖南桃江地区的全栈网页麻将游戏平台 TJMJ（桃江经典王麻将）的技术实现。平台前端采用 Vue 3 Composition API 单页架构与 Vite 8 构建工具链，后端基于 Node.js WebSocket 服务器，语音通信采用 WebRTC P2P 网状拓扑辅以 Twilio TURN 中继（10\,GB/月免费额度）。系统完整实现桃江地方麻将规则体系：打筛扳王（癞子）机制、扎鸟翻倍计分、门子累加番型、组合胡法等，支持单机 AI、四人联机、观战三种模式。核心算法包括 $\mathcal{O}(3^k)$ 递归回溯胡牌判定引擎（亚毫秒级实际运行时间）、启发式 NPC 出牌策略、客户端拖拽与服务器计数的差异化手牌同步算法。本文提供完整的系统架构图、协议定义、数学公式、算法伪代码、跨平台兼容性方案及性能基准数据。项目完全开源，总代码量约 4200 行，前端部署于 GitHub Pages，后端通过 ngrok 公网穿透。
-\end{minipage}\\[4pt]
-\rule{\linewidth}{0.5pt}
+\small\textbf{\color{orange!80!black}摘要}\quad
+\color{black!80}本文系统阐述面向湖南桃江地区的全栈网页麻将游戏平台 TJMJ（桃江经典王麻将）的技术实现。平台前端采用 Vue 3 Composition API 单页架构与 Vite 8 构建工具链，后端基于 Node.js WebSocket 服务器，语音通信采用 WebRTC P2P 网状拓扑辅以 Twilio TURN 中继（10\,GB/月免费额度）。系统完整实现桃江地方麻将规则体系：打筛扳王（癞子）机制、扎鸟翻倍计分、门子累加番型、组合胡法等，支持单机 AI、四人联机、观战三种模式。核心算法包括 $\mathcal{O}(3^k)$ 递归回溯胡牌判定引擎（亚毫秒级实际运行时间）、启发式 NPC 出牌策略、客户端拖拽与服务器计数的差异化手牌同步算法。本文提供完整的系统架构图、协议定义、数学公式、算法伪代码、跨平台兼容性方案及性能基准数据。项目完全开源，总代码量约 4200 行，前端部署于 GitHub Pages，后端通过 ngrok 公网穿透。
+\end{minipage}\\[2pt]
+{\color{cyan!60!black}\rule{\linewidth}{0.5pt}}\\[2pt]
+\begin{minipage}{0.95\linewidth}
+\footnotesize\textbf{\color{blue!60!black}关键词：} 麻将 $\cdot$ 全栈 Web $\cdot$ 实时多人游戏 $\cdot$ WebRTC $\cdot$ Node.js $\cdot$ Vue 3 $\cdot$ 递归回溯算法 $\cdot$ 跨平台兼容 \\
+\textbf{\color{blue!60!black}测试标识：} $\blacksquare$ 已验证 \quad $\square$ 待测试 \quad $\triangle$ 部分完成 \\
+\textbf{\color{blue!60!black}项目地址：} \url{https://github.com/JaijaiC/TJMJ} \quad \textbf{在线演示：} \url{https://jaijaic.github.io/TJMJ/}
+\end{minipage}\\[2pt]
+{\color{cyan!60!black}\rule{\linewidth}{0.5pt}}
 \end{center}
 
+\newpage
 \tableofcontents
 \newpage
 
+\usepackage{sectsty}
+\allsectionsfont{\color{blue!70!black}}
 % ===================================================================
 \section{引言}
 % ===================================================================
@@ -717,6 +742,211 @@ WebRTC 语音建立 & 200 & 800 & 2500 \\
   \node[font=\footnotesize,below=0.2cm of d] (e) {Server $\to$ all: game\_state $\to$ P2: your\_turn};
 \end{tikzpicture}
 \end{figure}
+
+% ===================================================================
+\section{项目工程架构}
+% ===================================================================
+
+\subsection{完整项目目录结构}
+
+图~\ref{fig:tree} 展示了 TJMJ 项目的完整文件组织架构。
+
+\begin{figure}[H]
+\centering
+\small
+\begin{verbatim}
+TJMJ/                                    # 项目根目录
+├── .git/                                # Git 版本控制
+├── .github/workflows/deploy.yml         # GitHub Actions CI (build 检查)
+├── .gitignore                           # 忽略规则 (node_modules, .vite, LaTeX aux)
+├── start-all.bat                        # 一键启动脚本 (Server + Frontend + ngrok)
+├── stop-all.bat                         # 停止脚本
+├── readme.md                            # 项目介绍与规则说明
+├── ARCHITECTURE.md                      # 全栈架构文档
+│
+├── docs/manual/                         # ★ 手册工作区
+│   ├── TJMJ_Technical_Manual_EN.tex     # 英文 LaTeX 源 (IEEE 风格)
+│   ├── TJMJ_Technical_Manual_EN.pdf     # 英文 PDF
+│   ├── TJMJ_Technical_Manual_CN.tex     # 中文 LaTeX 源 (本文档)
+│   └── TJMJ_Technical_Manual_CN.pdf     # 中文 PDF
+│
+├── frontend/                            # ★ Vue 3 前端 (SPA)
+│   ├── index.html                       # HTML 入口 (含缓存控制 meta)
+│   ├── vite.config.js                   # Vite 配置 (base: /TJMJ/)
+│   ├── package.json                     # vue 3.5 + vite 8.0 + gh-pages 6
+│   ├── dist/                            # 构建输出 (npm run build → npm run deploy)
+│   ├── src/
+│   │   ├── App.vue                      # ★ 主组件 (2602行: UI+逻辑+样式)
+│   │   ├── main.js                      # Vue 入口: createApp(App).mount('#app')
+│   │   ├── style.css                    # 全局样式 (iOS 安全区等)
+│   │   ├── core/                        # 游戏引擎 (纯逻辑)
+│   │   │   ├── constants.js             # 花色定义、258判定、王计算
+│   │   │   ├── HuCalculator.js          # 递归回溯胡牌判定引擎 (208行)
+│   │   │   └── RuleChecker.js           # 吃/碰/杠/听牌合法性 (142行)
+│   │   ├── ai/
+│   │   │   └── NpcStrategy.js           # NPC 启发式出牌策略 (227行)
+│   │   ├── network/
+│   │   │   └── client.js                # WebSocket 客户端 (224行: 重连/心跳/节流)
+│   │   ├── utils/
+│   │   │   ├── mjLogic.js               # 洗牌算法 + 牌墙4面布局
+│   │   │   └── speech.js                # 语音播报 (预录优先→TTS降级)
+│   │   └── components/
+│   │       └── HelloWorld.vue           # Vite 脚手架模板 (未使用)
+│   └── public/
+│       ├── images/                      # 牌面素材 (1-9万条筒 + 3D背景 + 头像)
+│       ├── sfx/                         # 预录制音效 (.gitkeep 预留)
+│       ├── docs/                        # 游戏内教程 PDF + 视频
+│       └── *.mp3                        # BGM 音乐 (1-13.mp3)
+│
+├── server/                              # ★ Node.js 游戏服务器
+│   ├── index.js                         # WebSocket 入口 (247行): 消息路由 + TURN生成
+│   ├── GameRoom.js                      # 房间状态机 (494行): LOBBY→PLAYING→SETTLEMENT
+│   ├── package.json                     # ws 8.18 + uuid 10
+│   └── game/                            # 游戏逻辑 (前端镜像，服务端权威校验)
+│       ├── constants.js / HuCalculator.js / RuleChecker.js / mjLogic.js
+│
+├── backend/                             # 早期 Socket.io 版本 (已废弃)
+├── other/                               # 本地工具 (ngrok.exe + 演示视频 + 旧版备份)
+│   └── TJMJ_Manual_Backup/              # 手册旧版归档
+│
+└── TJMJ_Technical_Manual.tex/.pdf       # → 已迁移至 docs/manual/
+\end{verbatim}
+\caption{项目完整文件树}
+\label{fig:tree}
+\end{figure}
+
+\subsection{项目总览框架}
+
+图~\ref{fig:framework} 以思维导图的形式总结了 TJMJ 项目的整体架构框架。
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[scale=0.75, every node/.style={transform shape}]
+  \node[rectangle,draw,rounded corners=3pt,fill=blue!8,text width=3.5cm,minimum height=1cm,align=center,font=\bfseries\small] (root) {TJMJ 项目框架};
+  \node[rectangle,draw,rounded corners=2pt,fill=green!8,text width=3cm,minimum height=0.8cm,align=center,font=\footnotesize,below left=1cm and -0.5cm of root] (f) {前端 Vue 3 SPA\\2602行 App.vue};
+  \node[rectangle,draw,rounded corners=2pt,fill=orange!8,text width=3cm,minimum height=0.8cm,align=center,font=\footnotesize,below right=1cm and -0.5cm of root] (b) {后端 Node.js WS\\741行 server/};
+  \node[rectangle,draw,rounded corners=2pt,fill=purple!8,text width=3cm,minimum height=0.8cm,align=center,font=\footnotesize,below=2.5cm of root] (d) {双端游戏引擎\\408行 core/ $\leftrightarrow$ game/};
+  \node[rectangle,draw,rounded corners=2pt,fill=cyan!8,text width=3cm,minimum height=0.8cm,align=center,font=\footnotesize,left=2cm of d] (v) {语音系统\\WebRTC + TURN};
+  \node[rectangle,draw,rounded corners=2pt,fill=yellow!8,text width=3cm,minimum height=0.8cm,align=center,font=\footnotesize,right=2cm of d] (ai) {AI 系统\\NpcStrategy 227行};
+  \node[rectangle,draw,rounded corners=2pt,fill=red!8,text width=3cm,minimum height=0.8cm,align=center,font=\footnotesize,below=1cm of d] (ci) {CI/CD\\GitHub Actions};
+  \node[rectangle,draw,rounded corners=2pt,fill=gray!10,text width=3cm,minimum height=0.8cm,align=center,font=\footnotesize,below left=1cm and -0.5cm of ci] (doc) {文档系统\\LaTeX 18页 + MD};
+  \node[rectangle,draw,rounded corners=2pt,fill=green!5,text width=3cm,minimum height=0.8cm,align=center,font=\footnotesize,below right=1cm and -0.5cm of ci] (dep) {部署\\GitHub Pages + ngrok};
+  \draw[arr] (root) -- (f); \draw[arr] (root) -- (b);
+  \draw[arr] (root) -- (d); \draw[arr] (f.south) -- (d.north);
+  \draw[arr] (b.south) -- (d.north); \draw[arr] (d) -- (v);
+  \draw[arr] (d) -- (ai); \draw[arr] (d) -- (ci);
+  \draw[arr] (ci) -- (doc); \draw[arr] (ci) -- (dep);
+\end{tikzpicture}
+\caption{TJMJ 项目总体框架图}
+\label{fig:framework}
+\end{figure}
+
+% ===================================================================
+\section*{附录 A：胡法计分补遗}
+\addcontentsline{toc}{section}{附录 A：胡法计分补遗}
+
+以下内容摘录自项目 \texttt{readme.md}，补充正文中未详尽展开的胡法与计分规则。
+
+\subsection*{A.1 完整胡法计分表}
+
+\begin{table}[H]
+\centering
+\caption{完整胡法计分（自摸 + 扎鸟）}
+\label{tab:score_full}
+\footnotesize
+\begin{tabular}{@{}llcccc@{}}
+\toprule
+\textbf{胡法} & \textbf{番数} & \textbf{扎一家得分} & \textbf{全中得分} & \textbf{未中出分} & \textbf{扎中出分} \\
+\midrule
+黑天胡  & 2番 & 8  & 12 & 2  & 4  \\
+地胡    & 2番 & 8  & 12 & 2  & 4  \\
+天胡    & 3番 & 12 & 18 & 3  & 6  \\
+天天胡  & 5番 & 20 & 30 & 5  & 10 \\
+碰碰胡  & 2番 & 8  & 12 & 2  & 4  \\
+清一色  & 2番 & 8  & 12 & 2  & 4  \\
+七小对  & 2番 & 8  & 12 & 2  & 4  \\
+将将胡  & 2番 & 8  & 12 & 2  & 4  \\
+起手胡  & 2番 & 8  & 12 & 2  & 4  \\
+开杠    & 2番 & 8  & 12 & 2  & 4  \\
+硬庄    & 2倍 & 8  & 12 & 2  & 4  \\
+地胡带拖& 3番 & 12 & 18 & 3  & 6  \\
+起手报听& 2番 & 8  & 12 & 2  & 4  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection*{A.2 组合胡法计算公式}
+
+组合胡法自摸得分通用公式：
+\begin{equation}
+S_{\text{自摸}} = (\Sigma\,\text{门子倍数}) \times F_{\text{扎鸟}} \times F_{\text{杠}}
+\end{equation}
+
+\textbf{实例}：
+\begin{itemize}[nosep]
+  \item 天胡七小对全中：$(3+2)\times 2 = 10$ 番
+  \item 天胡杠上花全中：$3\times 2\times 2 = 12$ 番
+  \item 硬庄将将胡不中：$2\times 2\times 2 = 4$ 番
+  \item 软庄碰碰胡的地胡带拖不中：$(2+2)\times 1\times 1 = 4$ 番
+  \item 硬庄将将胡的碰碰胡的天胡杠上花全中：$(2+2+2+2)\times 2\times 2 = 32$ 番
+\end{itemize}
+
+\subsection*{A.3 补充胡法规则}
+
+\begin{enumerate}
+  \item \textbf{诈胡}：牌局结束，由诈胡方当庄家，看牌型应得多少赔多少给三家。
+  \item \textbf{起手报听}：开局摸牌前，除庄家外其他三家起手 13 张只差一个"将"或"一句话"即可听牌，有王可以抓炮。
+  \item \textbf{天胡七小对}：3 番 + 2 番 = 5 番；天胡杠上花：3 番 $\times$ 2 $\times$ 2 = 12 番。
+  \item \textbf{明杠与暗杠}：暗杠手中有四张相同牌不用亮出；明杠别人打出一张你手中有三张。开杠后重新掷骰子从牌墙末尾摸三张。抢杠规则：明杠时该牌若恰好是其他玩家要胡的牌，直接判杠家全赔。
+  \item \textbf{112 牌规则}：108 张主牌（万筒条各 36 张）+ 36 张将（数字为 2/5/8 的牌）= 共 144 张麻将牌中实际使用 108 张。
+\end{enumerate}
+
+% ===================================================================
+\section*{附录 B：环境配置与启动}
+\addcontentsline{toc}{section}{附录 B：环境配置与启动}
+
+\begin{verbatim}
+# 1. 安装依赖
+cd frontend && npm install
+cd ../server && npm install
+
+# 2. 设置 TURN 环境变量 (可选，用于联机语音)
+set TWILIO_ACCOUNT_SID=ACxxxxxxxxxx
+set TWILIO_AUTH_TOKEN=your_auth_token
+
+# 3. 一键启动 (Windows)
+.\start-all.bat
+# → Window 1: Server @ :8080
+# → Window 2: Frontend @ :5173
+# → Window 3: ngrok tunnel
+
+# 4. 部署前端
+cd frontend && npm run build && npm run deploy
+
+# 5. 编译手册
+cd docs/manual
+xelatex TJMJ_Technical_Manual_CN.tex  # ×3 次
+\end{verbatim}
+
+\subsection*{依赖清单}
+
+\begin{table}[H]
+\centering
+\caption{项目依赖一览}
+\footnotesize
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{包} & \textbf{版本} & \textbf{用途} \\
+\midrule
+vue & 3.5 & 前端框架 \\
+vite & 8.0 & 构建工具 \\
+@vitejs/plugin-vue & 6.0 & Vite Vue 插件 \\
+gh-pages & 6.3 & GitHub Pages 部署 \\
+ws & 8.18 & WebSocket 服务端 \\
+uuid & 10.0 & 房间号生成 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 % ===================================================================
 \section*{参考资源}
