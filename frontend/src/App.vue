@@ -1336,15 +1336,19 @@ const setupNetworkListeners = () => {
       gameState.npcHands = msg.hands;
       gameState.handTiles = [...(msg.hands[spectateView.value] || [])];
     } else {
-      // 保留手动排序：只增删，不动已有顺序
+      // 智能合并：保留客户端拖拽顺序，仅增删
       if (msg.hand && msg.hand.length > 0) {
         const oldTiles = [...gameState.handTiles];
-        const serverTiles = msg.hand;
-        const removed = oldTiles.filter(t => !serverTiles.includes(t));
-        const added = serverTiles.filter(t => !oldTiles.includes(t));
-        let merged = oldTiles.filter(t => serverTiles.includes(t));
-        added.forEach(t => merged.push(t)); // 新牌放最右
-        // 只有牌数变化时才更新（避免覆盖拖拽排序）
+        const srv = [...msg.hand];
+        // 计数差集（处理重复牌）
+        const count = (arr) => { const m = {}; arr.forEach(v => m[v] = (m[v]||0)+1); return m; };
+        const oldCount = count(oldTiles), srvCount = count(srv);
+        const added = srv.filter(v => (srvCount[v]||0) > (oldCount[v]||0));
+        const removed = oldTiles.filter(v => (oldCount[v]||0) > (srvCount[v]||0));
+        // 移除旧牌（每次只删一个实例）
+        let merged = [...oldTiles];
+        removed.forEach(v => { const i = merged.indexOf(v); if (i >= 0) merged.splice(i, 1); });
+        added.forEach(v => merged.push(v)); // 新牌放最右
         if (removed.length > 0 || added.length > 0) {
           gameState.handTiles = merged;
         }
