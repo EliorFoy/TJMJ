@@ -11,11 +11,11 @@
     <div id="game-wrapper">
       <div class="mahjong-desk" :class="{ 'in-menu': isInMenu }">
 
-        <!-- 控制按钮：首页只显示BGM居中，游戏中显示全部 -->
-        <div class="top-controls" :class="{ 'menu-only': isInMenu }">
+        <!-- 控制按钮：游戏中显示全部 -->
+        <div class="top-controls">
           <button class="ctrl-btn" @click="nextSong" title="切歌" v-if="!isInMenu">▶</button>
           <button class="ctrl-btn" @click="toggleOskarpianist" title="O叔钢琴" v-if="!isInMenu" :style="gameGenre === 'o' ? { background: 'rgba(255,215,0,0.5)', borderColor: '#ffd700' } : {}">🎹</button>
-          <button class="ctrl-btn" @click="toggleMusic" :title="musicPlaying ? '暂停音乐' : '播放音乐'">{{ musicPlaying ? '🔊' : '🔇' }}</button>
+          <button class="ctrl-btn" @click="toggleMusic" :title="musicPlaying ? '暂停音乐' : '播放音乐'" v-if="!isInMenu">{{ musicPlaying ? '🔊' : '🔇' }}</button>
           <template v-if="!isInMenu">
             <button class="ctrl-btn mic-btn" @click="toggleMic" :title="micEnabled ? '关闭麦克风' : '打开麦克风'">
               <span class="mic-icon">{{ micEnabled ? '🎙️' : '🔕' }}</span>
@@ -60,6 +60,13 @@
               <a class="info-link" :href="`${BASE}docs/TJMJ_Technical_Manual.pdf`" target="_blank">教程文档</a>
               <a class="info-link" @click="openInfo('video')">演示视频</a>
               <a class="info-link" @click="openInfo('disclaimer')">使用协议</a>
+            </div>
+            <!-- 底部图标栏 -->
+            <div class="bottom-icons">
+              <button class="icon-btn" @click.stop="toggleMusic" :title="musicPlaying ? '暂停音乐' : '播放音乐'">{{ musicPlaying ? '🔊' : '🔇' }}</button>
+              <a class="icon-btn" href="https://github.com/JaiJaiC/TJMJ" target="_blank" title="GitHub 仓库">
+                <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+              </a>
             </div>
           </div>
         </div>
@@ -2021,6 +2028,11 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .info-link { font-size: 13px; color: #aaa; cursor: pointer; text-decoration: none; transition: color 0.2s; white-space: nowrap; }
 .info-link:hover { color: #ffd700; text-decoration: underline; }
 
+/* 首页底部图标栏（BGM + GitHub） */
+.bottom-icons { display: flex; justify-content: center; align-items: center; gap: 14px; margin-top: 20px; }
+.icon-btn { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 6px 10px; font-size: 18px; cursor: pointer; color: #ccc; display: flex; align-items: center; justify-content: center; transition: all 0.2s; text-decoration: none; line-height: 1; width: 40px; height: 36px; }
+.icon-btn:hover { background: rgba(255,255,255,0.18); color: #ffd700; border-color: #ffd700; }
+
 /* 内容弹窗（竖屏，右上X关闭） */
 .info-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.92); z-index: 999999; display: flex; align-items: center; justify-content: center; }
 .info-panel { position: relative; width: 90vw; max-width: 800px; height: 90vh; background: #1a1a2e; border-radius: 12px; overflow: hidden; }
@@ -2259,10 +2271,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 /* ===== 顶部控制栏（BGM / 语音 / 聊天，在游戏区域内） ===== */
 .top-controls { position: absolute; top: 28px; right: 100px; z-index: 99999; display: flex; gap: 3px; }
 /* 首页：BGM按钮居中略偏左，不挡"桃"字 */
-.top-controls.menu-only { right: 50%; transform: translateX(calc(50% - 90px)); gap: 0; }
-@media screen and (max-width: 1024px) and (orientation: portrait) {
-  .top-controls.menu-only { right: 50%; transform: translateX(calc(50% - 160px)); }
-}
+.top-controls { position: absolute; top: 28px; right: 100px; z-index: 99999; display: flex; gap: 3px; }
 .ctrl-btn { background: rgba(0,0,0,0.4); color: white; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 2px 6px; font-size: 15px; cursor: pointer; display: flex; align-items: center; gap: 2px; }
 .ctrl-btn:hover { background: rgba(0,0,0,0.7); }
 
