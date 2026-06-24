@@ -295,7 +295,7 @@
         </div>
 
         <!-- 亮牌展示（胡牌后显示四家手牌） -->
-        <div class="showdown-overlay" v-if="gameState.showdownHands && (gameState.gamePhase === 'WAITING' || gameState.gamePhase === 'SETTLEMENT')">
+        <div class="showdown-overlay" v-if="gameState.showdownHands && !settlement.active && (gameState.gamePhase === 'WAITING' || gameState.gamePhase === 'SETTLEMENT')">
           <div class="showdown-panel">
             <h3>🏆 本局结果</h3>
             <div class="showdown-row" v-for="(p, idx) in gameState.players" :key="idx">
@@ -1348,8 +1348,8 @@ const multiEmoji = (icon, target) => send({ type: 'emoji', icon, target });
 
 // 下一局或结束
 const nextRoundOrFinish = () => {
-  gameState.showdownHands = null;
   settlement.active = false;
+  // showdownHands 保留，结算后展示四家摊牌
   settlement.payments = [0, 0, 0, 0];
   settlement.confirmed = [false, false, false, false];
   gameState.zhaNiaoResult = null;
