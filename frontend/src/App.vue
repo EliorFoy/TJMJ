@@ -252,9 +252,16 @@
         <div class="settlement-overlay" v-if="settlement.active && settlement.winnerIndex >= 0">
           <div class="settlement-panel">
             <h3>💰 手动结算</h3>
-            <p>{{ gameState.players[settlement.winnerIndex]?.name }} 胡牌！</p>
+            <p :style="{ color: '#ffd700', fontWeight: 'bold', fontSize: '18px' }">{{ gameState.players[settlement.winnerIndex]?.name }} 胡牌！🎉</p>
+            <!-- 赢家全部手牌（含吃碰杠） -->
+            <div class="settlement-winner-tiles" v-if="gameState.showdownHands">
+              <span v-for="t in getWinnerFullHand()" :key="'wintile'+t" class="showdown-tile-wrapper">
+                <img :src="getImg('3d/lay_1.png')" class="showdown-tile-bg" />
+                <img :src="getImg(`tiles/${t}.png`)" class="showdown-tile-face" />
+              </span>
+            </div>
             <div class="settlement-row" v-for="(p, idx) in gameState.players" :key="'pay'+idx" :class="{ 'winner-row': idx === settlement.winnerIndex }">
-              <span class="settlement-name">{{ p.name }}</span>
+              <span class="settlement-name" :class="{ 'winner-name': idx === settlement.winnerIndex }">{{ p.name }}</span>
               <span v-if="idx === settlement.winnerIndex" class="settlement-winner">🎉 赢家</span>
               <template v-else>
                 <button class="settlement-pay-btn" @click="openNumpad(idx)">
@@ -670,6 +677,16 @@ const getFlatExposed = (pIndex) => {
   let flat = [];
   gameState.exposed[pIndex].forEach(group => flat.push(...group.tiles));
   return flat;
+};
+
+// 赢家全部手牌（含吃碰杠的副露）
+const getWinnerFullHand = () => {
+  if (!gameState.showdownHands) return [];
+  const w = settlement.winnerIndex;
+  if (w < 0) return [];
+  const hand = gameState.showdownHands[w] || [];
+  const exposed = getFlatExposed(w);
+  return [...exposed, ...hand].sort((a, b) => a - b);
 };
 
 // 生成吃牌按钮标签（如 "23"、"35"、"56"）
@@ -2322,7 +2339,12 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .settlement-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 6px 0; padding: 6px 10px; background: rgba(255,255,255,0.1); border-radius: 8px; }
 .settlement-row.winner-row { background: rgba(255,215,0,0.3) !important; border: 2px solid #ffd700 !important; box-shadow: 0 0 16px rgba(255,215,0,0.5) !important; }
 .settlement-name { font-size: 14px; font-weight: bold; }
+.settlement-name.winner-name { color: #ffd700; font-size: 16px; text-shadow: 0 0 8px rgba(255,215,0,0.6); }
 .settlement-winner { color: #ffd700; font-size: 14px; }
+.settlement-winner-tiles { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; margin: 10px 0; }
+.settlement-winner-tiles .showdown-tile-wrapper { width: 32px; height: 44px; position: relative; }
+.settlement-winner-tiles .showdown-tile-bg { width: 32px; height: 44px; position: absolute; }
+.settlement-winner-tiles .showdown-tile-face { width: 28px; height: 40px; position: absolute; top: 2px; left: 2px; }
 .settlement-pay-btn { padding: 6px 14px; font-size: 13px; background: linear-gradient(145deg, #ff9800, #f57c00); border: none; border-radius: 8px; color: white; cursor: pointer; font-weight: bold; }
 .settlement-confirm-btn { padding: 6px 10px; font-size: 12px; background: #555; border: 1px solid #888; border-radius: 8px; color: white; cursor: pointer; margin-left: 4px; }
 .settlement-confirm-btn:disabled { opacity: 0.3; cursor: default; }
