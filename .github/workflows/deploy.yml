@@ -1,8 +1,10 @@
 name: 自动部署桃江麻将到 GitHub Pages
 
 on:
-  # 每当你把代码推送到 main 分支时，自动触发
+  # push 到 main 或提 PR 到 main 时自动触发
   push:
+    branches: ['main']
+  pull_request:
     branches: ['main']
 
 # 设置云端服务器的读写权限
