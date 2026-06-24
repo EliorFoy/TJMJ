@@ -9,9 +9,10 @@
     </div>
 
     <div id="game-wrapper">
-      <!-- 左上角刷新按钮（保留房间状态） -->
-      <button class="refresh-btn" @click="safeRefresh" title="刷新页面（保留房间）">↻</button>
       <div class="mahjong-desk" :class="{ 'in-menu': isInMenu }">
+
+        <!-- 左上角刷新按钮（仅在游戏中显示） -->
+        <button class="refresh-btn" v-if="!isInMenu" @click="safeRefresh" title="刷新对局">↻</button>
 
         <!-- 控制按钮：游戏中显示全部 -->
         <div class="top-controls">
@@ -450,9 +451,9 @@ const shuffle = (arr) => { const a = [...arr]; for (let i = a.length - 1; i > 0;
 // Web Audio 音量压缩器（统一所有歌曲音量）
 let _audioCtx = null;
 let _compressor = null;
-const _initCompressor = () => {
-  if (_audioCtx) return;
-  try {
+let _sourceNode = null; // 防止重复 createMediaElementSource
+const _ensureAudioCtx = async () => {
+  if (!_audioCtx) {
     _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     _compressor = _audioCtx.createDynamicsCompressor();
     _compressor.threshold.value = -24;
@@ -461,21 +462,28 @@ const _initCompressor = () => {
     _compressor.attack.value = 0.003;
     _compressor.release.value = 0.25;
     _compressor.connect(_audioCtx.destination);
-  } catch(e) {}
+  }
+  if (_audioCtx.state === 'suspended') {
+    try { await _audioCtx.resume(); } catch(e) {}
+  }
 };
-const _connectCompressor = (audio) => {
+const _connectBgmCompressor = (audio) => {
   if (!_audioCtx || !_compressor) return;
-  try { _audioCtx.createMediaElementSource(audio).connect(_compressor); } catch(e) {}
+  if (_sourceNode) return; // 已连接，跳过（同一 audio 元素只需连一次）
+  try {
+    _sourceNode = _audioCtx.createMediaElementSource(audio);
+    _sourceNode.connect(_compressor);
+  } catch(e) { _sourceNode = null; }
 };
 
-const playSong = (filename) => {
+const playSong = async (filename) => {
   const audio = bgMusic.value;
   if (!audio) return;
-  _initCompressor();
+  await _ensureAudioCtx();
   audio.src = `/TJMJ/${encodeURI(filename)}`;
   audio.volume = 0.65;
   audio.load();
-  _connectCompressor(audio);
+  _connectBgmCompressor(audio);
   audio.play().then(() => {
     musicPlaying.value = true;
   }).catch((e) => {
@@ -871,8 +879,8 @@ const micEnabled = ref(false);
 const micLevel = ref(0); // 0-100 音量百分比
 const localStream = ref(null);
 const peerConnections = new Map(); // playerIndex → RTCPeerConnection
-let audioContext = null;
 let analyserNode = null;
+// 麦克风分析器共用 BGM 的 _audioCtx（避免重复上下文）
 let micLevelTimer = null;
 
 const rtcConfig = {
@@ -890,9 +898,9 @@ const rtcConfig = {
 const startMicLevelMonitor = async (stream) => {
   try {
     await _ensureAudioCtx();
-    analyserNode = audioContext.createAnalyser();
+    analyserNode = _audioCtx.createAnalyser();
     analyserNode.fftSize = 256;
-    const source = audioContext.createMediaStreamSource(stream);
+    const source = _audioCtx.createMediaStreamSource(stream);
     source.connect(analyserNode);
     const dataArray = new Uint8Array(analyserNode.frequencyBinCount);
     const tick = () => {
@@ -1049,20 +1057,9 @@ const closeAllPeerConnections = () => {
     localStream.value = null;
   }
   // 暂停 AudioContext（iOS 要求）
-  if (audioContext) {
-    try { audioContext.suspend(); } catch(e) {}
+  if (_audioCtx) {
+    try { _audioCtx.suspend(); } catch(e) {}
   }
-};
-
-// AudioContext 单例（iOS 需在用户手势后 resume）
-const _ensureAudioCtx = async () => {
-  if (!audioContext) {
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-  }
-  if (audioContext.state === 'suspended') {
-    try { await audioContext.resume(); } catch(e) {}
-  }
-  return audioContext;
 };
 
 const spectateRoomInput = ref('');
@@ -1162,16 +1159,21 @@ const joinRoom = async () => {
   multiState.joining = false;
 };
 
-// 安全刷新：保留房间信息到 URL 参数，刷新后自动重连
+// 安全刷新：联机保留房间重连，单机软重置不离开页面
 const safeRefresh = () => {
-  const roomId = netState.roomId || settlement.winnerIndex >= 0 ? '' : '';
-  if (netState.roomId) {
+  if (gameMode.value === 'multi' && netState.roomId) {
+    // 联机模式：URL 保存房间号 + 昵称，刷新后自动重连
     const url = new URL(location.href);
     url.searchParams.set('auto_join', netState.roomId);
     url.searchParams.set('name', multiState.playerName);
     location.replace(url.toString());
   } else {
-    location.reload();
+    // 单机/观战：直接重新开局，不离开页面
+    gameState.gamePhase = 'WAITING';
+    gameState.showdownHands = null;
+    settlement.active = false;
+    closeAllPeerConnections();
+    handleReady();
   }
 };
 
