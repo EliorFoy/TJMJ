@@ -68,11 +68,14 @@
         <div class="info-overlay" v-if="infoOverlay" @click.self="closeInfo">
           <div class="info-panel">
             <button class="info-close" @click="closeInfo">✕</button>
-            <!-- 教程文档 -->
-            <iframe v-if="infoOverlay === 'manual'" src="/TJMJ/docs/TJMJ_Technical_Manual.pdf" class="info-iframe" frameborder="0"></iframe>
+            <!-- 教程文档：新标签页高清打开 -->
+            <div v-if="infoOverlay === 'manual'" class="info-text" style="text-align:center;display:flex;align-items:center;justify-content:center;flex-direction:column;">
+              <p style="font-size:16px;color:#ddd;">点击下方按钮在新标签页中查看高清文档</p>
+              <a :href="`${BASE}docs/TJMJ_Technical_Manual.pdf`" target="_blank" class="info-link" style="font-size:18px;color:#ffd700;margin-top:16px;">📄 打开教程文档</a>
+            </div>
             <!-- 演示视频 -->
             <div v-if="infoOverlay === 'video'" class="info-video-wrap">
-              <video src="/showcase.mp4" controls autoplay class="info-video" controlsList="nodownload"></video>
+              <video :src="`${BASE}docs/showcase.mp4`" controls autoplay class="info-video" controlsList="nodownload"></video>
             </div>
             <!-- 使用协议 -->
             <div v-if="infoOverlay === 'disclaimer'" class="info-text">
@@ -366,8 +369,9 @@ import { speak, playDong, playWin } from './utils/speech.js';
 import { connect, send, on, off, netState, disconnect } from './network/client.js';
 
 // 【核心解法】动态读取环境路径，彻底消灭 404！
+const BASE = import.meta.env.BASE_URL;
 const getImg = (path) => {
-  return `${import.meta.env.BASE_URL}images/${path}`;
+  return `${BASE}images/${path}`;
 };
 
 const generateRandomAvatars = () => {
@@ -2262,7 +2266,10 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 /* ===== 顶部控制栏（BGM / 语音 / 聊天，在游戏区域内） ===== */
 .top-controls { position: absolute; top: 28px; right: 100px; z-index: 99999; display: flex; gap: 3px; }
 /* 首页：BGM按钮居中略偏左，不挡"桃"字 */
-.top-controls.menu-only { right: 50%; transform: translateX(calc(50% - 80px)); gap: 0; }
+.top-controls.menu-only { right: 50%; transform: translateX(calc(50% - 130px)); gap: 0; }
+@media screen and (max-width: 1024px) and (orientation: portrait) {
+  .top-controls.menu-only { right: 50%; transform: translateX(calc(50% - 160px)); }
+}
 .ctrl-btn { background: rgba(0,0,0,0.4); color: white; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 2px 6px; font-size: 15px; cursor: pointer; display: flex; align-items: center; gap: 2px; }
 .ctrl-btn:hover { background: rgba(0,0,0,0.7); }
 
