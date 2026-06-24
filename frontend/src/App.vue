@@ -918,10 +918,20 @@ const rtcConfig = {
 };
 
 // 启动音量监测
-const startMicLevelMonitor = async (stream) => {
+let _micCtxInit = false;
+const startMicLevelMonitor = (stream) => {
   try {
-    if (!_micCtx) _micCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (_micCtx.state === 'suspended') _micCtx.resume();
+    if (!_micCtx) {
+      _micCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    // iOS 需要显式 resume，且每次切换页面回来都可能被 suspend
+    if (_micCtx.state === 'suspended') {
+      _micCtx.resume().then(() => {
+        console.log('[语音] AudioContext 已恢复');
+      }).catch(() => {});
+    }
+    if (_micCtxInit) return; // 已经初始化过，避免重复创建节点
+    _micCtxInit = true;
     analyserNode = _micCtx.createAnalyser();
     analyserNode.fftSize = 256;
     const source = _micCtx.createMediaStreamSource(stream);
@@ -1295,6 +1305,9 @@ const setupNetworkListeners = () => {
     gameState.deckRemaining = msg.deckRemaining;
     gameState.wallTiles = msg.wallTiles || [];
     gameState.npcTileCounts = msg.tileCounts || [13, 13, 13, 13];
+    // 同步服务端手牌（防15张等计数偏差）
+    if (msg.hand) gameState.handTiles = [...msg.hand];
+    if (msg.hands) gameState.npcHands = msg.hands.map(h => [...h]);
     // 没有待处理动作时重置按钮（由服务器控制，不自动超时）
     // 观战模式：显示所有玩家手牌
     if (gameMode.value === 'spectate' && msg.hands) {
