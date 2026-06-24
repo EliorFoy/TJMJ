@@ -3,3 +3,12 @@
 
 # Local tools (ngrok etc.)
 other/
+
+# LaTeX auxiliary files
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk

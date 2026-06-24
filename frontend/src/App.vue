@@ -969,6 +969,7 @@ onMounted(async () => {
   const params = new URLSearchParams(location.search);
   const autoJoin = params.get('auto_join');
   if (autoJoin) {
+    stopMusic();
     gameMode.value = 'multi';
     isInMenu.value = false;
     lockLandscape();
