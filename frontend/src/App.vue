@@ -985,22 +985,40 @@ const toggleMic = async () => {
   }
 };
 
-const setupVoiceWithRoom = async () => {
+const setupVoiceWithRoom = () => {
   if (!localStream.value) return;
-  // 等待玩家列表抵达（防竞态）
   if (!netState.players || netState.players.length < 2) {
     setTimeout(() => setupVoiceWithRoom(), 800);
     return;
   }
   const myIdx = netState.playerIndex;
   myPlayerIndexForChat.value = myIdx;
-  // 关闭旧连接重建（确保音频轨道正确添加）
-  peerConnections.forEach(pc => pc.close());
-  peerConnections.clear();
+  // 增量更新：只连接新玩家，不断开已有连接
+  const currentPeers = new Set(peerConnections.keys());
   netState.players.forEach((p, i) => {
     if (i !== myIdx) {
-      createPeerConnection(i, myIdx < i);
-      console.log('[语音] 创建P2P连接: 我=' + myIdx + ' → 对方=' + i);
+      if (!currentPeers.has(i)) {
+        createPeerConnection(i, myIdx < i);
+        console.log('[语音] 创建P2P连接: 我=' + myIdx + ' → 对方=' + i);
+      } else {
+        // 已有连接：替换音轨（麦克风重新打开时更新）
+        const pc = peerConnections.get(i);
+        if (pc && localStream.value) {
+          pc.getSenders().forEach(s => pc.removeTrack(s));
+          localStream.value.getTracks().forEach(track => {
+            try { pc.addTrack(track, localStream.value); } catch(e) {}
+          });
+        }
+      }
+    }
+  });
+  // 清理已离开的玩家
+  const activePlayerIds = new Set(netState.players.map((_, i) => i));
+  peerConnections.forEach((pc, id) => {
+    if (!activePlayerIds.has(id)) {
+      try { pc.close(); } catch(e) {}
+      peerConnections.delete(id);
+      console.log('[语音] 移除断线玩家:', id);
     }
   });
 };
