@@ -1,5 +1,26 @@
 % ===========================================================================
-%
+%  TJMJ — 桃江经典王麻将  全栈技术手册
+%  Compile: xelatex TJMJ_Technical_Manual.tex (requires XeLaTeX + Chinese fonts)
+% ===========================================================================
+\documentclass[11pt,a4paper]{article}
+
+% ---------- Font & encoding ----------
+\usepackage[UTF8]{ctex}
+\usepackage{fontspec}
+\setmainfont{Times New Roman}
+\setCJKmainfont{SimSun}[BoldFont=SimHei,ItalicFont=KaiTi]
+\setCJKmonofont{FangSong}
+\usepackage[scaled]{helvet}
+\renewcommand{\ttdefault}{lmtt}
+
+% ---------- Page layout ----------
+\usepackage{geometry}
+\geometry{top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm}
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\textit{TJMJ Technical Manual}}
+\fancyhead[R]{\small\thepage}
 \renewcommand{\headrulewidth}{0.4pt}
 
 % ---------- Scientific packages ----------
@@ -13,7 +34,6 @@
 \hypersetup{colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue}
 \usepackage{float}
 \usepackage{caption}
-\usepackage{subcaption}
 \usepackage{listings}
 \usepackage{tikz}
 \usetikzlibrary{shapes,arrows,positioning,fit}
@@ -26,30 +46,31 @@
   rulecolor=\color{gray!40},
   backgroundcolor=\color{gray!5},
   keywordstyle=\color{blue}\bfseries,
-  commentstyle=\color{green!50!black},   % 中文注释不用斜体 (仿宋无 italic)
+  commentstyle=\color{green!50!black},
   stringstyle=\color{red!70!black},
   showstringspaces=false,
   numbers=left,
   numberstyle=\tiny\color{gray},
   numbersep=5pt,
   tabsize=2,
-  language={}             % no predefined language — manual keywords below
+  language={}
 }
 
 % ---------- Title / authors ----------
 \title{\bfseries\LARGE TJMJ: A Full-Stack Web-Based Taojiang Classic \\[2pt]
-       Wang Mahjong Platform for Entertainment \& Education}
+       Wang Mahjong Platform for Entertainment \& Education \\[4pt]
+       \large 全栈技术手册 v2.0}
 
 \author{%
-  JaiJaiC\thanks{Correspondence: Project homepage: \url{https://github.com/JaijaiC/TJMJ}}
+  JaiJaiC\thanks{Correspondence: \url{https://github.com/JaijaiC/TJMJ}}
   \and
   TJMJ Development Team \\
-  \small\textit{School of Entertainment Computing, TJMJ Lab} \\[4pt]
+  \small\textit{Taojiang, Hunan, China} \\[4pt]
   \small\texttt{\{jaijai.c\}@tjmj.dev}
 }
 \date{\today}
 
-% ---------- Abstract styling ----------
+% ---------- Abstract ----------
 \newcommand{\natureabstract}[1]{%
   \begin{center}
   \rule{\linewidth}{0.8pt}\\[2pt]
@@ -66,21 +87,25 @@
 
 \natureabstract{
   桃江经典王麻将 (Taojiang Jingdian Wang Majiang, TJMJ) 是一款面向湖南桃江地区麻将爱好者的全栈网页麻将游戏平台。
-  本项目完整实现了桃江地方麻将的核心规则——包括打筛扳王(癞子)机制、扎鸟翻倍、门子加番、
-  组合胡法等复杂计分系统，并提供单人模式、四人联机对战、观战模式三大玩法。
-  技术架构采用 Vue 3 + Vite 前端、Node.js WebSocket 服务端、WebRTC 实时语音通信，
-  并通过 ngrok 实现公网穿透部署。本文系统阐述 TJMJ 的游戏规则数学模型、
-  软件架构设计、核心算法实现（胡牌判定、听牌检测、NPC 策略智能体），
-  并讨论当前技术瓶颈与未来 Mahjong Agent 训练方向。
-  本项目完全开源，仅供家庭娱乐与学术研究使用。
+  本项目完整实现了桃江地方麻将的核心规则——包括打筛扳王（癞子）机制、扎鸟翻倍、门子累加番、
+  组合胡法等复杂计分体系，并提供单机模式、四人联机对战、观战模式三大玩法。
+  技术架构采用 Vue 3 Composition API + Vite 8 前端、Node.js + ws WebSocket 服务端、
+  WebRTC P2P 实时语音（含 Twilio TURN 中继），前端通过 GitHub Pages 托管、后端通过 ngrok 公网穿透。
+  全文共八节，系统阐述游戏规则数学模型、前后端全栈架构（含完整通信协议与数据流）、
+  核心算法实现（递归回溯胡牌判定、听牌检测、NPC 启发式策略）、
+  多平台设备兼容性方案（iOS/Android/桌面端）、语音系统设计以及未来 Mahjong Agent 训练方向。
+  本项目完全开源（MIT License），仅供家庭娱乐与学术研究使用。
 }
+
+\tableofcontents
+\newpage
 
 % ===================================================================
 \section{Introduction}
 % ===================================================================
 
 麻将 (Mahjong) 作为中国传统博弈游戏的代表，在湖南桃江地区形成了独具特色的地方变种——桃江经典王麻将。
-其核心特征包括：108 张万/筒/条字牌（不含风牌与花牌）、"王"（癞子/万能牌）机制、
+其核心特征包括：108 张万/筒/条字牌（不含风牌与花牌）、``王''（癞子/万能牌）机制、
 打筛扳王确定癞子、扎鸟翻倍计分、门子累加番型等复杂规则，与标准国标麻将或四川血战麻将存在显著差异。
 
 目前市面上仅有闲逸等少数 App 提供益阳麻将玩法，但其存在以下不足：
@@ -90,10 +115,14 @@
 (4) 无法训练 AI 对弈智能体。
 
 为此，我们设计并开发了 TJMJ——一款与桃江麻将规则高度一致、无需安装、
-点击链接即可进入的网页麻将平台。本文将从游戏规则数学建模（第 2 节）、
-系统架构（第 3 节）、核心算法（第 4 节）以及现存问题与未来工作（第 5 节）
-四个方面对该平台进行完整的技术阐述。
+点击链接即可进入的网页麻将平台。本文第 2 节详述游戏规则与数学模型；
+第 3 节展示全栈系统架构与通信协议；第 4 节剖析核心算法实现；
+第 5 节介绍联动功能（语音、头像、音效）；第 6 节分析多平台兼容性方案；
+第 7 节总结已解决与仍存在的问题；第 8 节记录开发方法与部署流程。
 
+\textbf{项目规模}：总计约 4200 行核心代码，其中前端主文件 \texttt{App.vue} 2600 行、
+服务端 \texttt{GameRoom.js} 494 行、WebSocket 客户端 224 行、AI 策略 227 行、
+胡牌引擎 208 行、规则检查 142 行、语音模块 100 行。
 
 % ===================================================================
 \section{Game Rules \& Mathematical Formulation}
@@ -109,12 +138,11 @@
   \item \textbf{筒} (Tong, $B$): 一筒 $\sim$ 九筒，各 4 张 (31--39)
 \end{itemize}
 
-编码约定：花色十位数（1=万, 2=条, 3=筒）+ 数字个位数。
-例：$38$ 表示八筒，$15$ 表示五万。
+编码约定：花色十位数（1=万, 2=条, 3=筒）+ 数字个位数。例：$38$ 表示八筒，$15$ 表示五万。
 
 \textbf{术语表}：
 \begin{itemize}[nosep]
-  \item \textbf{王 (\textit{Wang})}： 癞子/万能牌，可替代任意牌使用。由开局"打筛扳王"确定。
+  \item \textbf{王 (\textit{Wang})}： 癞子/万能牌，可替代任意牌使用。由开局``打筛扳王''确定。
   \item \textbf{地 (\textit{Di})}： 扳开的那张牌本身，用于判定地胡。
   \item \textbf{将 (\textit{Jiang})}： 数字为 2、5、8 的牌（任意花色），共 36 张。胡牌必需品。
   \item \textbf{一句话 (\textit{YiJuHua})}： 三张牌构成 $AAA$（刻子）或 $ABC$（顺子，同花色连续）。
@@ -122,7 +150,6 @@
   \item \textbf{扎鸟 (\textit{ZhaNiao})}： 胡牌后翻下一张牌，根据数字确定输赢翻倍。
   \item \textbf{门子 (\textit{MenZi})}： 特殊胡牌类型（碰碰胡、清一色等），采用累加番规则。
 \end{itemize}
-
 
 \subsection{Dice Rolling \& Wall Breaking}
 
@@ -136,18 +163,17 @@
 \textbf{开牌位置}：在该墙右手边开始往左数，跳过 $d_1$（较小骰数）叠，从下一叠开始抓牌。
 
 \textbf{抓牌顺序}：庄家起抓，每人每次取一码（两叠=4张），共三轮（$3 \times 4 = 12$ 张/人）。
-然后"收庄"每人各补 1 张（各得 13 张），庄家再补 1 张（14 张），游戏开始。
+然后``收庄''每人各补 1 张（各得 13 张），庄家再补 1 张（14 张），游戏开始。
 
 \textbf{扳王规则}：
 从起手墙对应玩家的下家墙左手边开始往右数，到第 $d_2$（较大骰数）叠处扳开最上面一张牌，
-此牌即为"地"（$T_d$），$T_d + 1$（模 10 循环，花色不变）即为"王"/癞子：
+此牌即为``地''（$T_d$），$T_d + 1$（模 10 循环，花色不变）即为``王''/癞子：
 \begin{equation}
   T_w = \begin{cases}
     \lfloor T_d/10 \rfloor \times 10 + 1, & \text{if } T_d \bmod 10 = 9 \\
     T_d + 1, & \text{otherwise}
   \end{cases}
 \end{equation}
-
 
 \subsection{Basic Actions \& Priority}
 
@@ -159,7 +185,8 @@
   \item \textbf{吃 (Chi)} — 仅能吃上家打出的牌，构成顺子
 \end{enumerate}
 
-优先级规则：\textbf{点炮（胡）$>$ 碰（杠）$>$ 吃}。抢杠规则：若明杠的牌恰好是别家要胡的牌，直接判杠家全赔（相当于抓炮）。
+优先级规则：\textbf{点炮（胡）$>$ 碰（杠）$>$ 吃}。联机模式中，若同时可碰和可吃，两个按钮同时亮起供玩家选择。
+抢杠规则：若明杠的牌恰好是别家要胡的牌，直接判杠家全赔。
 
 \subsubsection*{吃 (Chi)}
 只能吃上家打出的牌，且必须与手中两张牌构成同花色顺子。例：上家打 $4$ 万，手中有 $(2,3)$ 或 $(3,5)$ 或 $(5,6)$ 万即可吃。
@@ -170,14 +197,12 @@
 \subsubsection*{杠 (Gang)}
 分明杠（他人打出，手中有三张）和暗杠（手中四张，未亮出）。开杠后重新掷骰子，从牌墙末尾倒数摸三张。若摸到能胡的牌直接胡（杠上花），否则由下家开始依次判定能否胡此三张。
 
-
 \subsection{Winning Patterns (Hu Types)}
 
 胡牌的基本结构为：\textbf{一对将 (Jiang) + 四句话 (Sentence)}，
-其中"一句话"可以是刻子（$AAA$）或顺子（$ABC$）。
+其中``一句话''可以是刻子（$AAA$）或顺子（$ABC$）。
 
-表~\ref{tab:hu_types} 列出了所有胡法类型及其番数。门子胡法采用\textbf{累加番}规则：
-胡牌总番数 $=$ 基础胡法番 $+$ 各门子番数之和。
+表~\ref{tab:hu_types} 列出了所有胡法类型及其番数。门子胡法采用\textbf{累加番}规则。
 
 \begin{table}[H]
 \centering
@@ -196,7 +221,7 @@
 将将胡     & 14 张全部为 2/5/8             & 2 番 \\
 起手胡     & 庄家 14 张首轮直接胡          & 2 番 \\
 开杠       & 明杠/暗杠后摸三张胡牌         & 2 番 \\
-地胡       & 摸到三张"地"即可胡           & 2 番 \\
+地胡       & 摸到三张``地''即可胡          & 2 番 \\
 天胡       & 手牌有 3 个王               & 3 番 \\
 天天胡     & 手牌有 4 个王               & 5 番 \\
 黑天胡     & 首轮无王、无将、无一句话      & 2 番 \\
@@ -218,13 +243,11 @@
   \item 硬庄将将胡碰碰胡天胡杠上花全中：$(2+2+2+2) \times 2 \times 2 = 32$ 番
 \end{itemize}
 
-
 \subsection{Scoring \& ZhaNiao (扎鸟)}
 
 胡牌分为\textbf{自摸}（自己摸到胡牌）和\textbf{抓炮}（他人打出胡牌）两种方式。
 
-\subsubsection*{自摸计分}
-胡牌后进行扎鸟：翻开本该下家摸的那张牌（$T_z$），根据 $T_z \bmod 10$ 的值判定翻倍对象：
+\textbf{自摸计分：} 胡牌后进行扎鸟：翻开本该下家摸的那张牌（$T_z$），根据 $T_z \bmod 10$ 判定：
 \begin{itemize}[nosep]
   \item $1,5,9$（全中）：三家输分均翻倍
   \item $2,6$：下家输分翻倍
@@ -235,9 +258,7 @@
 设基础分 $B = 3$（平胡 1 番 $\times$ 底分 3），番数 $M$，扎鸟系数 $Z \in \{1,2\}$：
 赢家得分 $=$ 输家各支付 $B \times M \times Z$（扎中者）或 $B \times M$（未扎中者）。
 
-\subsubsection*{核心规则}
-有癞子只能自摸（不能抓炮），无癞子可以抓炮。这一规则使"硬庄"（无王胡牌）更具策略价值。
-
+\textbf{核心规则：} 有王只能自摸（不可抓炮），无王可以抓炮。这一规则使``硬庄''（无王胡牌）更具策略价值。
 
 % ===================================================================
 \section{System Architecture}
@@ -245,125 +266,249 @@
 
 \subsection{Overview}
 
-TJMJ 采用典型的三层 B/S 架构，整体部署拓扑如图~\ref{fig:arch} 所示。
+TJMJ 采用三层 B/S 架构。前端 Vue 3 SPA 部署于 GitHub Pages，服务端 Node.js WebSocket 运行于本地并通过 ngrok 暴露公网端点，WebRTC 语音为纯 P2P 网状拓扑。
 
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[
-  node distance=1.2cm,
-  box/.style={rectangle, draw, rounded corners, minimum width=2.2cm, minimum height=0.8cm, align=center, font=\small},
+  node distance=1.3cm,
+  box/.style={rectangle, draw, rounded corners, minimum width=2.5cm, minimum height=0.9cm, align=center, font=\small},
   arrow/.style={->, >=stealth, thick}
 ]
-  \node[box, fill=blue!10] (browser) {Browser Client\\Vue 3 + Vite};
+  \node[box, fill=blue!10] (browser) {Browser Client\\Vue 3 + Vite\\TCP 5173};
   \node[box, fill=green!10, right=of browser] (ngrok) {ngrok Tunnel\\wss://};
   \node[box, fill=orange!10, right=of ngrok] (ws) {WebSocket Server\\Node.js :8080};
-  \node[box, fill=red!10, below=of ws] (game) {Game Engine\\mjLogic.js};
-  \node[box, fill=purple!10, left=of game] (ai) {AI Agent\\NpcStrategy.js};
+  \node[box, fill=red!10, below=of ws] (game) {Game Room FSM\\GameRoom.js};
+  \node[box, fill=purple!10, below=of browser] (ai) {AI Agent\\NpcStrategy.js};
+  \node[box, fill=cyan!10, left=of ai] (voice) {WebRTC Voice\\(P2P Mesh)};
 
-  \draw[arrow] (browser) -- (ngrok);
-  \draw[arrow] (ngrok) -- (ws);
+  \draw[arrow] (browser) -- (ngrok) node[midway, above, font=\footnotesize] {wss://};
+  \draw[arrow] (ngrok) -- (ws) node[midway, above, font=\footnotesize] {:8080};
   \draw[arrow] (ws) -- (game);
   \draw[arrow] (game) -- (ai);
-  \draw[arrow] (browser) to[out=-30, in=-150] node[below, font=\footnotesize] {WebRTC Voice} (browser);
+  \draw[arrow] (browser) to[out=-60, in=60] node[right, font=\footnotesize] {P2P} (voice);
+  \draw[arrow] (browser.east) to[out=30, in=150] (browser.west);
+  \draw[arrow, dashed, gray] (ws) -- (voice) node[midway, right, font=\footnotesize] {信令中继};
 \end{tikzpicture}
 \caption{系统架构拓扑图}
 \label{fig:arch}
 \end{figure}
 
-
-\subsection{Frontend — Vue 3 SPA}
-
-前端是基于 Vue 3 的单页应用（SPA），使用 Vite 构建，部署于 GitHub Pages。
-
-\textbf{技术栈}：
-\begin{itemize}[nosep]
-  \item \textbf{Vue 3.5} (Composition API + reactive) — 响应式UI框架
-  \item \textbf{Vite 8.x} — 构建工具 (HMR 热更新)
-  \item \textbf{Web Speech API} — 浏览器内置语音播报
-  \item \textbf{Web Audio API} — BGM 背景音乐管理
-  \item \textbf{WebRTC} — 点对点实时语音通信
-\end{itemize}
-
-\textbf{源码结构}：
-\begin{lstlisting}[language=,basicstyle=\ttfamily\tiny]
-frontend/src/
-  main.js              # Vue 入口
-  App.vue              # 主游戏界面 (3000+ loc)
-  style.css            # 全局样式
-  core/
-    constants.js       # 牌花色定义、258判定、王计算
-    HuCalculator.js    # 胡牌判定引擎
-    RuleChecker.js     # 吃碰杠听牌检测
-  utils/
-    mjLogic.js         # 洗牌、牌墙布局
-    speech.js          # 语音播报(吃碰杠胡)
-  ai/
-    NpcStrategy.js     # NPC 出牌决策策略
-  network/
-    client.js          # WebSocket 联机客户端
-\end{lstlisting}
-
-
-\subsection{Backend — Node.js WebSocket Server}
-
-服务端基于 Node.js + ws 库，负责房间管理、游戏状态同步、操作合法性校验。
-
-\textbf{技术栈}：
-\begin{itemize}[nosep]
-  \item \textbf{Node.js} — 运行时
-  \item \textbf{ws} (v8.18) — WebSocket 服务端
-  \item \textbf{uuid} (v10) — 房间号生成
-\end{itemize}
-
-\textbf{源码结构}：
-\begin{lstlisting}[language=,basicstyle=\ttfamily\tiny]
-server/
-  index.js             # WS 入口，消息路由 (180 loc)
-  GameRoom.js          # 房间管理、游戏流程
-  game/
-    constants.js       # 牌定义 (前端镜像)
-    mjLogic.js         # 洗牌、牌墙布局 (前端镜像)
-    HuCalculator.js    # 胡牌计分引擎
-    RuleChecker.js     # 操作合法性校验
-\end{lstlisting}
-
-
-\subsection{Communication Protocol}
-
-客户端与服务器通过 WebSocket 进行 JSON 消息通信。核心消息类型：
+\subsection{Technology Stack}
 
 \begin{table}[H]
 \centering
-\caption{WebSocket 消息协议}
-\label{tab:protocol}
-\tiny
+\caption{技术栈总览}
+\label{tab:stack}
+\small
 \begin{tabular}{@{}lll@{}}
 \toprule
-\textbf{type} & \textbf{方向} & \textbf{说明} \\
+\textbf{层} & \textbf{技术} & \textbf{作用} \\
 \midrule
-\texttt{create\_room} & C→S & 创建房间 \\
-\texttt{join\_room}   & C→S & 加入房间 (8888=测试) \\
-\texttt{ready}        & C→S & 准备就绪 \\
-\texttt{discard}      & C→S & 出牌 \\
-\texttt{draw}         & C→S & 摸牌 \\
-\texttt{action}       & C→S & 吃/碰/杠/胡操作 \\
-\texttt{pass}         & C→S & 过牌 \\
-\texttt{pay}          & C→S & 手动转分 \\
-\texttt{emoji}        & C↔S & 表情 \\
-\texttt{chat}         & C↔S & 文字弹幕 \\
-\texttt{webrtc\_*}    & C↔S & WebRTC 信令中继 \\
-\texttt{join\_spectate}& C→S & 观战 \\
+前端框架 & Vue 3.5 (Composition API) & 响应式 UI \\
+构建工具 & Vite 8 + Rolldown & 打包/HMR \\
+前端部署 & GitHub Pages & 静态托管 \\
+服务端运行时 & Node.js & 无框架纯 JS 服务 \\
+服务端通信 & ws (v8.18) & WebSocket \\
+服务端部署 & ngrok & TCP 隧道 (公网) \\
+实时语音 & WebRTC (P2P 网状) & 4 人通话 \\
+NAT 穿透 & Twilio TURN (10GB/月) & 移动网络穿透 \\
+语音合成 & Web Speech API + 预录 mp3 & 牌名播报 \\
+CI/CD & GitHub Actions & PR build 检查 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Network Topology \& ngrok}
+\subsection{Project Structure}
 
-本地开发使用 \texttt{ws://localhost:8080} 直连；公网部署通过 ngrok 建立 TCP 隧道，
-客户端自动检测 \texttt{location.hostname} 切换 \texttt{wss://} 连接。
-消息发送采用\textbf{缓冲队列}机制：连接建立前的消息先入队，\texttt{onopen} 后批量冲刷，
-避免连接尚未就绪时 send 报错。
+完整的项目文件树及其职责：
 
+\begin{lstlisting}[language=,basicstyle=\ttfamily\scriptsize]
+TJMJ/
+  frontend/                        # Vue 3 SPA
+    src/
+      App.vue                      # ★ 主组件 (2602行: UI+逻辑+样式)
+      main.js                      # Vue 入口: createApp(App).mount('#app')
+      style.css                    # 全局样式（iOS 安全区等）
+      core/                        # 游戏引擎（纯逻辑，无 UI 依赖）
+        constants.js               # 花色枚举、258 判定、王计算
+        HuCalculator.js            # 递归回溯胡牌判定引擎 (208行)
+        RuleChecker.js             # 吃/碰/杠/听牌合法性 (142行)
+      ai/
+        NpcStrategy.js             # NPC 启发式出牌策略 (227行)
+      network/
+        client.js                  # WebSocket 客户端 (224行: 重连/心跳/节流)
+      utils/
+        mjLogic.js                 # 洗牌算法 + 牌墙布局
+        speech.js                  # 语音播报 (预录音优先 → TTS 降级)
+      components/
+        HelloWorld.vue             # Vite 脚手架模板（未使用）
+    public/
+      images/                      # 牌面素材(1-9万条筒 + 3D背景)
+      sfx/                         # 预录制音效 (.gitkeep 预留)
+      docs/                        # PDF教程 + 演示视频
+      *.mp3                        # BGM 背景音乐 (1-13.mp3)
+    index.html
+    vite.config.js                 # base: '/TJMJ/' (GitHub Pages)
+    package.json                   # vue 3.5 + vite 8.0 + gh-pages 6
+  server/                          # Node.js 游戏服务器
+    index.js                       # ★ WebSocket 入口 (247行)
+    GameRoom.js                    # ★ 房间状态机 (494行)
+    game/                          # 游戏逻辑（前端镜像，服务端权威校验）
+      constants.js / HuCalculator.js / RuleChecker.js / mjLogic.js
+    package.json                   # ws + uuid
+  backend/                         # 早期 Socket.io 版本（已废弃）
+  other/                           # 本地工具 (ngrok.exe + 演示视频)
+  .github/workflows/deploy.yml     # GitHub Actions CI (build 检查)
+  start-all.bat                    # 一键启动 (3 窗口)
+  readme.md / ARCHITECTURE.md / .gitignore
+\end{lstlisting}
+
+\textbf{代码量统计：}
+
+\begin{table}[H]
+\centering
+\caption{核心文件代码行数}
+\label{tab:loc}
+\small
+\begin{tabular}{@{}lr@{}}
+\toprule
+\textbf{文件} & \textbf{行数} \\
+\midrule
+frontend/src/App.vue & 2602 \\
+server/GameRoom.js & 494 \\
+server/index.js & 247 \\
+frontend/src/ai/NpcStrategy.js & 227 \\
+frontend/src/network/client.js & 224 \\
+frontend/src/core/HuCalculator.js & 208 \\
+frontend/src/core/RuleChecker.js & 142 \\
+frontend/src/utils/speech.js & 100 \\
+\midrule
+\textbf{合计} & \textbf{4244} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Communication Protocol}
+
+客户端与服务器通过单一 WebSocket 长连接进行 JSON 消息通信。完整协议定义如下：
+
+\begin{table}[H]
+\centering
+\caption{WebSocket 消息协议（完整版）}
+\label{tab:protocol}
+\footnotesize
+\begin{tabular}{@{}llp{5.5cm}@{}}
+\toprule
+\textbf{type} & \textbf{方向} & \textbf{说明} \\
+\midrule
+\texttt{create\_room} & C$\to$S & 创建新房间（可选 4 位指定号码） \\
+\texttt{join\_room} & C$\to$S & 加入房间（8888=测试） \\
+\texttt{ready} & C$\to$S & 准备就绪（4 人满自动开局） \\
+\texttt{ready\_next} & C$\to$S & 确认继续（4 人全确认开新局） \\
+\texttt{discard} & C$\to$S & 出牌（携带牌值 tile） \\
+\texttt{draw} & C$\to$S & 摸牌 \\
+\texttt{action} & C$\to$S & 吃/碰/杠/胡操作（携带 action + combo） \\
+\texttt{pass} & C$\to$S & 过牌 \\
+\texttt{chat} & C$\leftrightarrow$S & 文字弹幕（携带 text + fromName） \\
+\texttt{emoji} & C$\leftrightarrow$S & 表情（携带 icon + target） \\
+\texttt{webrtc\_offer/answer/ice} & C$\leftrightarrow$S & WebRTC 信令中继（不解析 data） \\
+\texttt{update\_avatar} & C$\to$S & 头像更新（携带 avatar 数据） \\
+\texttt{get\_turn} & C$\to$S & 请求 TURN 凭据 \\
+\texttt{join\_spectate} & C$\to$S & 加入观战 \\
+\texttt{ping} & C$\to$S & 心跳检测 \\
+\midrule
+\texttt{room\_created/joined} & S$\to$C & 房间创建/加入成功 \\
+\texttt{room\_players} & S$\to$C & 玩家列表更新（含昵称/头像/状态） \\
+\texttt{game\_start} & S$\to$C & 开局（每人收到自己的 hand、wangTile、dice） \\
+\texttt{game\_state} & S$\to$C & 实时状态同步（弃牌/副露/剩余牌数/当前回合） \\
+\texttt{action\_prompt} & S$\to$C & 请求玩家操作（含 canHu/Peng/Gang/Chi） \\
+\texttt{drew\_tile} & S$\to$C & 摸到某张牌 \\
+\texttt{round\_end} & S$\to$C & 本局结束（含四家亮牌） \\
+\texttt{pong} & S$\to$C & 心跳回复 \\
+\texttt{turn\_credentials} & S$\to$C & Twilio TURN 凭据（动态生成） \\
+\texttt{avatar\_updated} & S$\to$C & 头像已同步 \\
+\texttt{game\_end} & S$\to$C & 16 局终局 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Server Architecture: GameRoom Finite State Machine}
+
+\texttt{GameRoom.js} 是整个联机游戏的核心——它是一个有限状态机，管理从等待到结算的完整生命周期。
+
+\textbf{状态转换：}
+\begin{verbatim}
+  LOBBY → (4人满 + 全部 ready) → PLAYING
+  PLAYING → (有人胡牌 / 流局) → SETTLEMENT
+  SETTLEMENT → (4人全部确认继续) → PLAYING (下一局)
+  SETTLEMENT → (第16局结束) → LOBBY
+\end{verbatim}
+
+\textbf{核心方法：}
+
+\begin{table}[H]
+\centering
+\caption{GameRoom 核心方法}
+\label{tab:gameroom}
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{方法} & \textbf{职责} \\
+\midrule
+\texttt{startGame()} & 洗牌、发牌 (53张)、扳王、广播 game\_start \\
+\texttt{handleDiscard(p, tile)} & 出牌处理：移除手牌 → 广播 → checkIntercepts \\
+\texttt{handleDraw(p)} & 摸牌处理 → 自摸检测 \\
+\texttt{checkIntercepts(p, tile)} & 检查 3 家能否吃碰杠胡 → 通知相关玩家 \\
+\texttt{resolveActions()} & 收集响应 → 优先级排序（胡>杠>碰>吃）→ 执行 \\
+\texttt{nextTurn()} & 切换回合 → 发新牌 → 通知摸牌 \\
+\texttt{endRound(winner)} & 结算：赢家坐庄、亮牌、等待确认 \\
+\texttt{playerReadyForNext(p)} & 确认计数，4 人满后开新局 \\
+\texttt{broadcastPublic()} & 向所有玩家发送 game\_state \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{关键设计：}
+\begin{itemize}[nosep]
+  \item \textbf{双端校验}：frontend/core/ 和 server/game/ 各有一份相同的游戏逻辑（HuCalculator, RuleChecker, mjLogic）。单机模式走前端，联机模式前端仅做本地预览、服务端做权威判定。
+  \item \textbf{超时保护}：\texttt{checkIntercepts} 设置 \texttt{pendingActions} 后会启动 10 秒超时。若某玩家断线未响应，超时自动强制清除并调用 \texttt{nextTurn()}，防止游戏永久卡死。
+  \item \textbf{手牌不排序}：服务端发牌和摸牌均不调用 \texttt{.sort()}，保留发牌自然顺序。客户端通过计数差集算法智能合并——仅增删变更的牌，保持玩家手动拖拽顺序不变。
+  \item \textbf{防重复抓牌}：\texttt{physicalDraw()} 自动跳过 \texttt{diIndex}（地牌位置），确保扳开的牌不会被摸走。
+\end{itemize}
+
+\subsection{Client Network Layer}
+
+\texttt{client.js} 实现了生产级的 WebSocket 网络层：
+
+\begin{itemize}[nosep]
+  \item \textbf{自动重连}：指数退避策略 (1s → 2s → 4s → ... → 128s)，最多 8 次。重连成功后自动重新加入原房间（利用 URL 参数 \texttt{?auto\_join=} 保存房间号和昵称）。
+  \item \textbf{心跳检测}：每 10 秒发 ping，收到 pong 后计算往返延迟，更新游戏界面左上角 4 格信号图标（<100ms 满格, <400ms 两格）。
+  \item \textbf{消息节流}：游戏操作 400ms 节流防止高频崩溃；WebRTC 信令和聊天不节流。
+  \item \textbf{缓冲队列}：连接建立前的消息先入队列，\texttt{onopen} 后批量冲刷。
+  \item \textbf{URL 持久化}：创建/加入房间后自动将房间号和昵称写入 URL 参数，支持页面刷新后自动重连回当前对局。
+\end{itemize}
+
+\subsection{Deployment Topology}
+
+\begin{verbatim}
+  开发者本地                      云端
+  ┌──────────┐   git push        ┌─────────────────┐
+  │ 源码      │ ───────────────► │ GitHub (main)    │
+  │ git repo  │                   │  ├── GitHub Pages│ ← 前端静态文件
+  └────┬─────┘                   │  └── Actions CI  │ ← build 检查
+       │ npm run deploy          └─────────────────┘
+       │ (gh-pages -d dist)
+       │
+       ├── start-all.bat
+       │   ├── Window 1: server → :8080
+       │   ├── Window 2: frontend → :5173
+       │   └── Window 3: ngrok http 8080
+       ▼
+    玩家访问 https://jaijaic.github.io/TJMJ/
+         └── WebSocket → ngrok → server :8080
+         └── WebRTC Voice → P2P mesh + Twilio TURN (10GB/月)
+\end{verbatim}
 
 % ===================================================================
 \section{Core Algorithms}
@@ -371,7 +516,7 @@ server/
 
 \subsection{Hu Detection Algorithm (胡牌判定)}
 
-胡牌判定是麻将引擎最核心的算法模块，对应文件 \texttt{HuCalculator.js}。
+胡牌判定是麻将引擎最核心的算法模块，对应文件 \texttt{HuCalculator.js}（前端和 server/game/ 各一份镜像）。
 算法采用\textbf{递归回溯 + 贪心剪枝}策略：
 
 \begin{enumerate}[nosep]
@@ -396,6 +541,7 @@ server/
   \item 全部消除成功 → 胡牌；任何分支失败 → 回溯
 \end{enumerate}
 
+计算复杂度：最坏情况 $O(3^k)$，$k$ 为递归深度，通常 $k \leq 4$，单次判定 <1ms。
 
 \subsection{Ting Detection Algorithm (听牌检测)}
 
@@ -409,20 +555,15 @@ server/
   \item 若任意候选能胡 → 听牌 true；否则 false
 \end{enumerate}
 
-此算法的正确性依赖于胡牌判定引擎的完备性。计算复杂度 $O(34 \times 3^k)$，
-其中 $k$ 为递归深度（通常 $k \leq 4$，实战 < 1ms）。
-
+计算复杂度 $O(34 \times 3^k)$，实战 <1ms。
 
 \subsection{NPC Strategy Agent (AI 出牌决策)}
 
-\texttt{NpcStrategy.js} 实现了一个基于启发式规则的单人模式 NPC 智能体。
-当前版本采用\textbf{手牌价值评估 + 听牌最大化}策略：
+\texttt{NpcStrategy.js} (227 行) 实现启发式决策：
 
 \begin{enumerate}[nosep]
-  \item \textbf{听牌优先}：遍历每张手牌，模拟丢弃后检查是否听牌
-    (\texttt{findBestDiscardToTing()})。若能直接听牌，优先打出该牌。
-  \item \textbf{价值排序}：若未听牌，按优先级评估手牌价值
-    (\texttt{chooseWorstTile()})：
+  \item \textbf{听牌优先}：遍历每张手牌，模拟丢弃后检查是否听牌 (\texttt{findBestDiscardToTing()})。若能直接听牌，优先打出该牌。
+  \item \textbf{价值排序}：若未听牌，按优先级评估手牌价值 (\texttt{chooseWorstTile()})：
     \begin{itemize}[nosep]
       \item 孤张（无相邻牌、非将、非王）→ 最优先丢弃
       \item 边张/坎张（只能等 1 张进张）→ 次优先
@@ -430,12 +571,38 @@ server/
       \item 将对（2/5/8 对子）→ 高价值保留
       \item 王牌 → 绝不丢弃
     \end{itemize}
-  \item \textbf{安全出牌}：参考弃牌池，避免打出别家可能胡的"炮牌"
+  \item \textbf{安全出牌}：参考弃牌池，避免打出别家可能胡的炮牌
+  \item \textbf{吃碰决策}：\texttt{shouldPeng()} / \texttt{shouldChi()} 评估手牌改善程度
 \end{enumerate}
 
-未来工作：将 NPC 升级为基于深度强化学习（DRL）的 Mahjong Agent，
-使用蒙特卡洛树搜索 (MCTS) 与自我对弈 (Self-Play) 训练。
+未来方向：升级为 DRL（深度强化学习）+ MCTS（蒙特卡洛树搜索）的自我对弈训练智能体。
 
+\subsection{Voice System}
+
+\texttt{speech.js} (100 行) 实现双轨语音播报：
+
+\begin{enumerate}[nosep]
+  \item \textbf{预录制优先}：检测 \texttt{public/sfx/} 下是否存在对应 mp3 文件（如 \texttt{tile\_15.mp3} → ``五万''），存在则直接播放 Audio 元素
+  \item \textbf{TTS 降级}：文件缺失时使用浏览器 \texttt{SpeechSynthesis} API 合成语音
+  \item \textbf{Web Audio 合成}：``咚''出牌音由 OscillatorNode 实时合成（800Hz → 200Hz 扫描，150ms）
+\end{enumerate}
+
+\textbf{音效文件清单}（需录制 34 个文件放入 \texttt{public/sfx/}）：
+27 个牌名 (\texttt{tile\_11.mp3}--\texttt{tile\_39.mp3}) + 7 个动作词 (\texttt{chi.mp3}, \texttt{peng.mp3}, \texttt{gang.mp3}, \texttt{hu.mp3}, \texttt{zimo.mp3}, \texttt{win.mp3}, \texttt{pass.mp3})。
+
+\subsection{WebRTC Voice Architecture}
+
+联机语音采用\textbf{P2P 网状拓扑}（Mesh）：每个玩家与房间内其他 3 人各建立一条 RTCPeerConnection。
+信令（offer/answer/ICE candidate）通过 WebSocket 服务端中继。
+
+\begin{itemize}[nosep]
+  \item \textbf{STUN/TURN}：Google STUN ×2 + Twilio TURN（10GB/月免费额度）。
+  TURN 凭据由服务端 HMAC-SHA1 动态生成，24 小时有效，每小时刷新。
+  \item \textbf{音频约束}：使用 \texttt{echoCancellation, noiseSuppression, autoGainControl} 三项降噪。
+  \item \textbf{增量连接}：不因玩家列表变化而拆毁已有连接；仅在玩家加入/离开时增量创建/移除对应 PeerConnection。
+  \item \textbf{音轨替换}：麦克风重新开启时，遍历已有连接替换 senders 音轨。
+  \item \textbf{iOS 兼容}：AudioContext 创建后检测 \texttt{suspended} 状态并显式 \texttt{resume()}。
+\end{itemize}
 
 % ===================================================================
 \section{Features \& User Interface}
@@ -443,60 +610,81 @@ server/
 
 \subsection{Game Modes}
 
-平台提供三种游戏模式：
+平台提供三种游戏模式，均通过 \texttt{enterGame(mode)} 入口统一调度：
 
 \begin{enumerate}[nosep]
-  \item \textbf{单人模式}：玩家 vs 3 个 NPC AI，适合练习
-  \item \textbf{联机模式}：4 人实时对战，创建/加入房间（4 位数字房间号）
-  \item \textbf{观战模式}：旁观正在进行的对局（每次仅可选择一方视角）
+  \item \textbf{单机模式}：玩家 vs 3 个 NPC AI。适合练习、测试规则。由客户端 \texttt{startRound()} 完全控制游戏流程。
+  \item \textbf{联机模式}：4 人实时对战。创建/加入 4 位数字房间号。服务端 GameRoom 管理状态，客户端仅做本地预览。
+  \item \textbf{观战模式}：旁观正在进行的对局。接收 \texttt{game\_state} 同步渲染，可选择观看任意一方视角。
 \end{enumerate}
+
+\textbf{模式切换数据流：}
+\begin{verbatim}
+  isInMenu=true
+    ├── 点击"单机模式" → enterGame('single')
+    │   └── handleReady() → startRound() → 本地游戏循环
+    ├── 点击"联机模式" → enterGame('multi')
+    │   └── createRoom() / joinRoom() → WebSocket → 等待4人 → 服务器开局
+    ├── 点击"观战模式" → enterGame('spectate')
+    │   └── joinSpectate() → 接收 game_state 并显示
+    └── 点击"其他玩法" → 已禁用
+\end{verbatim}
 
 \subsection{Interactive Features}
 
 \begin{itemize}[nosep]
-  \item \textbf{拖拽手牌}：手牌可自由拖动排列，自动摸张固定在右侧
-  \item \textbf{表情系统}：点击头像可向其他玩家发送表情包
-  \item \textbf{实时转分}：点击头像下方计分区域可手动转分
-  \item \textbf{文字弹幕}：右上角聊天按钮，支持全屏弹幕聊天
-  \item \textbf{实时语音}：基于 WebRTC 的点对点语音通信
-  \item \textbf{BGM 控制}：首页轻触声音按钮开关背景音乐；
-        局内右上角切换钢琴纯音乐模式
-  \item \textbf{语音播报}：浏览器内置 TTS 播报"吃""碰""杠""胡了"等操作
+  \item \textbf{拖拽手牌}：HTML5 Drag \& Drop + 触屏 Touch Events 双支持。手牌稳定 ID key 防止 Vue VNode 重排。所有游戏操作（出牌/吃/碰/杠）均同步更新 \texttt{handTileIds} 数组保持顺序一致。
+  \item \textbf{头像系统}：点击自己头像弹出 12 格预设选择面板 + 拍照/上传自定义图片（FileReader → base64 data URL）。联机模式下通过 \texttt{update\_avatar} 消息实时同步给其他三人。头像存储于 \texttt{localStorage} 持久化。
+  \item \textbf{表情互动}：5 种表情（🌹💩🥚💣💵）点击发送，飞行动画效果。💵 真转账 1 分。
+  \item \textbf{文字弹幕}：右上角聊天按钮，消息从右向左滚动，兼容桌面和移动端。
+  \item \textbf{BGM 系统}：首页 2 首交替播放 + 游戏内 9-13 首随机不重复队列 + O 叔钢琴模式（7 首）。统一音量压缩（Web Audio DynamicsCompressor）。
+  \item \textbf{实时语音}：WebRTC P2P 网状通话，Twilio TURN 中继。音量实时显示条形波动。
+  \item \textbf{语音播报}：出牌时自动播报牌名（``五万''``碰''等）。
 \end{itemize}
 
-
 % ===================================================================
-\section{Discussion}
+\section{Device Compatibility}
 % ===================================================================
 
-\subsection{Known Issues}
+\subsection{Mobile Device Handling}
 
-当前版本存在以下技术瓶颈：
+本项目已实现以下跨平台兼容措施：
+
+\begin{table}[H]
+\centering
+\caption{兼容性修复清单}
+\label{tab:compat}
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+\textbf{问题} & \textbf{解决方案} \\
+\midrule
+手机 NAT 穿透失败 & Twilio TURN (10GB/月) + Google STUN ×2 \\
+iOS Safari click 不触发 & \texttt{<div>} → \texttt{<button>} 替换非交互元素 \\
+iOS AudioContext 静音 & 检测 \texttt{suspended} 状态并 \texttt{resume()} \\
+\multicolumn{1}{l}{iOS 双击缩放} & \texttt{@touchend} handler 中 \texttt{preventDefault()} \\
+Android 地址栏跳动 & \texttt{100dvh} 替代 \texttt{100vh}（带 fallback） \\
+触屏慢点击漏检 & 轻点阈值从 300ms 扩大到 500ms \\
+WebSocket 断线 & 指数退避重连 (1s→128s, 最多8次) \\
+桌面端 fixed 弹窗偏移 & 弹窗组件移出 \texttt{game-wrapper} 避免 transform 影响 \\
+联机操作卡死 & 服务端 10 秒超时强制清除 \texttt{pendingActions} \\
+麦克风权限拒绝 & 特征检测 + 用户提示 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Known Remaining Issues}
 
 \begin{enumerate}[nosep]
-  \item \textbf{兼容性问题}：安卓/iOS、手机/桌面端渲染差异导致偶发 UI 错位
-  \item \textbf{实时语音不稳定}：WebRTC 多人（≥3）出现断连/回声，需引入 SFU 中转
-  \item \textbf{结算界面不完整}：结束时无法查看赢家完整手牌
-  \item \textbf{麻将音效缺失}：需补充"一万""吃""我胡了"等地方语音音效
-  \item \textbf{昵称不可修改}：当前无改名功能
-  \item \textbf{断线重连缺失}：服务器断开后无法恢复房间状态
-  \item \textbf{复杂吃碰逻辑卡死}：高频操作下偶发 UI 冻结，需引入操作节流与状态机
-  \item \textbf{托管模式}：胡牌判定失败或卡死后缺乏自动恢复机制
+  \item \textbf{语音偶发断续}：P2P 网状拓扑在 3+ 人时复杂度 $O(n^2)$，高丢包环境下部分连接可能掉线。长期方案：引入 SFU（Selective Forwarding Unit）中转。
+  \item \textbf{桌面端 CSS 缩放}：\texttt{updateGameScale()} 对宽屏/竖屏适配仍有边界情况。
+  \item \textbf{手牌拖拽范围}：触屏拖拽时 DOM 查询 \texttt{getBoundingClientRect()} 在 CSS Transform 缩放后可能返回不准确坐标。
+  \item \textbf{音效文件缺失}：34 个预录制 mp3 文件尚未录制，当前全部降级为 TTS。
+  \item \textbf{观战模式功能有限}：仅支持选择一方视角，不支持自动切换。
 \end{enumerate}
 
-\subsection{Future Work: Mahjong Agent}
-
-项目规划的核心远期目标是训练一个高性能 Mahjong Agent：
-\begin{itemize}[nosep]
-  \item 利用完美信息自我对弈 (Self-Play) 生成训练数据
-  \item 采用深度 Q 网络 (DQN) 或 PPO 算法学习出牌策略
-  \item 引入蒙特卡洛树搜索 (MCTS) 提升决策质量
-  \item 目标：Agent 达到或超越人类高手水平，成为玩家的学习陪练
-\end{itemize}
-
-
 % ===================================================================
-\section{Methods}
+\section{Development \& Deployment}
 % ===================================================================
 
 \subsection{Development Environment}
@@ -510,58 +698,123 @@ server/
 \toprule
 \textbf{组件} & \textbf{版本/技术} \\
 \midrule
-前端框架    & Vue 3.5 (Composition API) \\
-构建工具    & Vite 8.0 \\
-服务端      & Node.js + ws 8.18 \\
-语音        & Web Speech API + WebRTC \\
-内网穿透    & ngrok \\
-版本管理    & Git + GitHub \\
-部署        & GitHub Pages (前端) + ngrok (后端) \\
+前端框架 & Vue 3.5 (Composition API + \texttt{<script setup>}) \\
+构建工具 & Vite 8.0 + Rolldown \\
+服务端 & Node.js + ws 8.18 \\
+语音 & Web Speech API + WebRTC + 预录 mp3 \\
+TURN 中继 & Twilio TURN (10GB/月，HMAC-SHA1 动态凭据) \\
+内网穿透 & ngrok (前端 localhost 5173，后端 8080) \\
+版本管理 & Git + GitHub \\
+前端部署 & GitHub Pages (\texttt{gh-pages -d dist}) \\
+CI & GitHub Actions (PR 触发 build 检查) \\
 \midrule
-Node 依赖   & vue, vite, @vitejs/plugin-vue, gh-pages \\
-            & ws, uuid \\
+Node 依赖 & vue, vite, @vitejs/plugin-vue, gh-pages \\
+ & ws, uuid \\
 \bottomrule
 \end{tabular}
 \end{table}
 
+\subsection{Startup Commands}
 
-\subsection{Deployment}
-
-\textbf{启动命令}（Windows）：
+\textbf{一键启动（Windows）：}
 \begin{lstlisting}[language=bash, basicstyle=\ttfamily\small]
-# 一键启动所有服务
 .\start-all.bat
-# 依次启动: Server :8080 -> Frontend :5173 -> ngrok
+# 依次启动 3 个窗口:
+#   [1] Game Server   WebSocket :8080
+#   [2] Frontend      Vite :5173
+#   [3] ngrok Tunnel  (forward 8080, optional)
 \end{lstlisting}
 
-\textbf{手动启动}：
+\textbf{手动启动：}
 \begin{lstlisting}[language=bash, basicstyle=\ttfamily\small]
 # Terminal 1 - Game Server
-cd server && npm run dev    # WebSocket :8080
+cd server && npm run dev
 
 # Terminal 2 - Frontend
-cd frontend && npm run dev  # Vite :5173
+cd frontend && npm run dev
 
-# Terminal 3 - ngrok (optional)
+# Terminal 3 - ngrok (optional, for public access)
 ngrok http 8080
 \end{lstlisting}
 
+\textbf{部署前端：}
+\begin{lstlisting}[language=bash, basicstyle=\ttfamily\small]
+cd frontend
+npm run build      # Vite 打包到 dist/
+npm run deploy     # gh-pages 推送至 GitHub Pages
+\end{lstlisting}
 
-\subsection{Testing}
+\textbf{环境变量（TURN 功能需要）：}
+\begin{lstlisting}[language=bash, basicstyle=\ttfamily\small]
+set TWILIO_ACCOUNT_SID=ACxxxxxxxxxx
+set TWILIO_AUTH_TOKEN=your_auth_token
+cd server && npm run dev
+\end{lstlisting}
 
-测试房间 \texttt{8888} 常驻运行，自动在状态异常时重建。
-满 4 人且全部 ready 后 0.8 秒自动开局（create\_room 满员则 1.5 秒延迟开局）。
+\subsection{Data Flow: A Complete Game Round}
 
+\begin{verbatim}
+玩家 A 打开页面
+  └── onMounted → restoreAvatar → BGM 默认关闭
+
+玩家 A 创建房间
+  └── connect() → create_room → server: new GameRoom
+      └── A 收到 room_created (roomId)
+      └── URL 写入 ?auto_join=xxxx&name=AAA
+
+玩家 B/C/D 加入房间
+  └── join_room(roomId) → server: addPlayer
+      └── room_players 广播 → 4人列表显示
+
+4人 ready → 服务器开局
+  └── GameRoom.startGame()
+      ├── Fisher-Yates 洗牌 108 张
+      ├── 掷骰子 (d1,d2) → 定庄家起手位置
+      ├── 扳王 → calculateWang(diTile)
+      ├── 发牌 53 张 (庄家14张, 闲家13张)
+      └── game_start 广播 (每人只收到自己的 hand)
+
+游戏循环:
+  A 出牌 → send({type:'discard',tile})
+    → server: handleDiscard → 移除手牌 → broadcastPublic
+    → 其他人收到 game_state: 更新弃牌池 + 手牌数
+
+  checkIntercepts(A→B/C/D):
+    ├── 有人能胡 → endRound(winner)
+    ├── 有人能碰/杠 → action_prompt (等待选择)
+    ├── 下家能吃 → action_prompt (等待选择)
+    └── 无人拦截 → nextTurn → B 摸牌 → broadcastPublic
+
+  B 摸牌 → 自摸检测 → 出牌 → 循环继续
+  超时保护: 10s 无响应 → 强制跳过
+
+胡牌 → endRound(winnerIndex)
+  ├── 赢家坐庄 (dealerIndex = winnerIndex)
+  ├── 亮牌 showdownHands (四家手牌全部可见)
+  ├── 各玩家点击"确认继续" → playerReadyForNext
+  └── 4人全部确认 → startGame (下一局)
+\end{verbatim}
+
+% ===================================================================
+\section*{Future Work}
+\addcontentsline{toc}{section}{Future Work}
+
+\begin{itemize}[nosep]
+  \item \textbf{Mahjong Agent}：基于深度强化学习（PPO/DQN）+ MCTS 自我对弈，训练达到人类高手水平的 AI。
+  \item \textbf{语音升级}：引入 SFU 中转替代 P2P 网状，解决 4 人语音不稳定问题。
+  \item \textbf{音效录制}：完成 34 个预录制 mp3 文件，提升游戏沉浸感。
+  \item \textbf{观战增强}：支持多视角自动切换、回放功能。
+  \item \textbf{性能优化}：App.vue 分拆为多个组件，降低单文件复杂度。
+  \item \textbf{移动端原生体验}：PWA 离线支持、推送通知。
+\end{itemize}
 
 % ===================================================================
 \section*{Code Availability}
 \addcontentsline{toc}{section}{Code Availability}
 
-本项目完全开源，代码仓库：
-\url{https://github.com/JaijaiC/TJMJ}
+本项目完全开源，代码仓库：\url{https://github.com/JaijaiC/TJMJ}
 
 欢迎 Fork / Star / Pull Request。
-
 
 % ===================================================================
 \section*{Disclaimer}
@@ -571,13 +824,12 @@ ngrok http 8080
 所有规则及实现仅供参考，实际游玩请以当地线下规则为准。
 因使用本软件产生的任何争议或损失，开发者不承担相关责任。
 
-
 % ===================================================================
 \section*{Acknowledgments}
 \addcontentsline{toc}{section}{Acknowledgments}
 
 感谢湖南桃江的家人朋友提供规则校验与测试反馈；感谢开源社区
-(Vue.js, Node.js, Vite) 提供的优秀工具链。
+(Vue.js, Node.js, Vite, ws) 提供的优秀工具链。
 
 参考项目：
 \begin{itemize}[nosep]
@@ -585,14 +837,11 @@ ngrok http 8080
   \item 武汉麻将在线 (\url{http://cdn0001.afrxvk.cn/whmj/go.html})
 \end{itemize}
 
-
-% ===================================================================
-%  Reference-style footer
 % ===================================================================
 \vfill
 \begin{center}
 \rule{\linewidth}{0.4pt}
-{\small\textit{TJMJ v1.0 -- Technical Manual -- \today}}\\[2pt]
+{\small\textit{TJMJ v2.0 -- Technical Manual -- \today}}\\[2pt]
 {\tiny 桃江经典王麻将\,\,|\, Taojiang Classic Wang Mahjong}\\[2pt]
 {\tiny \copyright\ 2024--2026 JaiJaiC. All rights reserved. 仅供个人娱乐学习使用。}
 \end{center}
