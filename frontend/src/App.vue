@@ -352,19 +352,18 @@
       </div>
     </div>
 
-    <!-- 头像选择器——game-wrapper 外层 -->
-    <div class="avatar-picker-overlay" v-if="showAvatarPicker" @click.self="showAvatarPicker = false">
-      <div class="avatar-picker-panel">
-        <h3>选择头像</h3>
-        <div class="avatar-grid">
-          <img v-for="n in 12" :key="'av'+n" :src="getImg(`avatars/${n}.表情包.png`)" class="avatar-option" @click="selectPresetAvatar(n)" />
+    <!-- 头像选择器（inline style 强制定位） -->
+    <div v-if="showAvatarPicker" @click.self="showAvatarPicker = false" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:2147483647;display:flex;align-items:center;justify-content:center;">
+      <div style="background:#1a1a2e;border:2px solid #ffd700;border-radius:8px;padding:10px;text-align:center;width:200px;">
+        <h3 style="color:#ffd700;margin:0 0 6px;font-size:13px;">选择头像</h3>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:8px;">
+          <img v-for="n in 12" :key="'av'+n" :src="getImg(`avatars/${n}.表情包.png`)" style="width:100%;aspect-ratio:1;border-radius:6px;border:2px solid #444;cursor:pointer;background:#fff;object-fit:cover;" @click="selectPresetAvatar(n)" />
         </div>
-        <div class="avatar-picker-actions">
-          <button class="avatar-action-btn" @click="takePhoto">📷 拍照</button>
-          <button class="avatar-action-btn" @click="avatarFileInput?.click()">📁 图片</button>
-          <button class="avatar-action-btn cancel" @click="showAvatarPicker = false">取消</button>
+        <div style="display:flex;gap:4px;justify-content:center;">
+          <button style="background:rgba(255,255,255,.15);border:1px solid #555;border-radius:5px;color:#ddd;padding:3px 8px;font-size:11px;cursor:pointer;" @click="pickImageFile">📷 拍照</button>
+          <button style="background:rgba(255,255,255,.15);border:1px solid #555;border-radius:5px;color:#ddd;padding:3px 8px;font-size:11px;cursor:pointer;" @click="pickImageFile">📁 图片</button>
+          <button style="background:rgba(255,255,255,.15);border:1px solid #555;border-radius:5px;color:#ddd;padding:3px 8px;font-size:11px;cursor:pointer;" @click="showAvatarPicker = false">取消</button>
         </div>
-        <input ref="avatarFileInput" type="file" accept="image/*" style="display:none" @change="loadCustomAvatar" />
       </div>
     </div>
   </div>
@@ -621,23 +620,27 @@ const openEmojiPicker = (playerIndex) => {
 
 // === 头像选择器 ===
 const showAvatarPicker = ref(false);
-const avatarFileInput = ref(null);
 const applyAvatar = (avatar) => {
   const myIdx = gameMode.value === 'multi' ? netState.playerIndex : 0;
   gameState.players[myIdx].avatar = avatar;
   localStorage.setItem('tjmj_avatar', avatar);
   showAvatarPicker.value = false;
-  // 联机模式：通知服务器同步给其他玩家
   if (gameMode.value === 'multi' && netState.roomId) {
     send({ type: 'update_avatar', avatar });
   }
 };
-const loadCustomAvatar = (e) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => { applyAvatar(reader.result); };
-  reader.readAsDataURL(file);
+const pickImageFile = () => {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => { applyAvatar(reader.result); };
+    reader.readAsDataURL(file);
+  };
+  input.click();
 };
 const selectPresetAvatar = (num) => {
   applyAvatar(`${num}.表情包`);
@@ -648,15 +651,6 @@ const restoreAvatar = () => {
     const myIdx = gameMode.value === 'multi' ? netState.playerIndex : 0;
     gameState.players[myIdx].avatar = saved;
   }
-};
-// 拍照（调用相机）
-const takePhoto = () => {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = 'image/*';
-  input.capture = 'environment'; // 后置摄像头
-  input.onchange = loadCustomAvatar;
-  input.click();
 };
 
 const sendEmoji = (icon) => {
@@ -2454,16 +2448,8 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .avatar-img.clickable { cursor: pointer; }
 .avatar-img.clickable:hover { transform: scale(1.15); filter: brightness(1.2); transition: 0.2s; }
 
-/* 头像选择器 */
-.avatar-picker-overlay { position: fixed !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; background: rgba(0,0,0,0.3) !important; z-index: 2147483647 !important; display: flex !important; align-items: center !important; justify-content: center !important; }
-.avatar-picker-panel { background: #1a1a2e; border: 2px solid #ffd700; border-radius: 8px; padding: 10px; text-align: center; max-width: 200px !important; width: 200px !important; }
-.avatar-picker-panel h3 { color: #ffd700; margin: 0 0 6px; font-size: 13px; }
-.avatar-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 8px; }
-.avatar-option { width: 100%; aspect-ratio: 1; border-radius: 6px; border: 2px solid #444; cursor: pointer; background: #fff; object-fit: cover; }
-.avatar-picker-actions { display: flex; gap: 4px; justify-content: center; }
-.avatar-action-btn { background: rgba(255,255,255,0.15); border: 1px solid #555; border-radius: 5px; color: #ddd; padding: 3px 8px; font-size: 11px; cursor: pointer; }
-.avatar-action-btn:hover { background: #ffd700; color: #1a1a2e; border-color: #ffd700; }
-.avatar-action-btn.cancel { border-color: #666; color: #888; }
+/* 头像选择器（已改 inline style，此处仅保留面板图片的 hover 效果） */
+.avatar-option:hover { border-color: #ffd700 !important; transform: scale(1.08) !important; }
 
 /* 动作按钮 */
 .action-buttons { position: absolute; bottom: 85px; right: 10%; display: flex; gap: 5px; z-index: 100; }
