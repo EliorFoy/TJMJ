@@ -578,7 +578,7 @@ const dragOverIndex = ref(-1); // 拖拽悬停的目标索引
 
 // 昵称记忆 & 随机
 const showMemory = ref(false);
-const memoryNames = ['cjj','zzw','xjh','xjt','lsy','syy','hj','lem'];
+const memoryNames = ['cjj','zzw','xjh','xjt','lsy','syy','hj','hlh','cyh'];
 const randomNames = ['祖国人','内向小男孩','乡里人','城里人','花开富贵','奥特曼','如来佛','机器人','最强NPC','AI','路障僵尸','阿强','阿珍','阿贵','超鬼','奥利给','球草','球花'];
 let lastRollIdx = -1;
 const rollNickname = () => {
@@ -1986,7 +1986,8 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .ready-player { display: flex; flex-direction: column; align-items: center; position: relative; }
 .ready-avatar { width: 60px; height: 60px; border-radius: 10px; border: 3px solid #555; transition: 0.3s; }
 .ready-avatar.is-ready { border-color: #4CAF50; box-shadow: 0 0 15px #4CAF50; }
-.ready-badge { position: absolute; bottom: 20px; background: #4CAF50; color: white; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: bold; }
+.ready-badge { background: #4CAF50; color: white; padding: 2px 10px; border-radius: 10px; font-size: 12px; font-weight: bold; }
+.room-player .ready-badge { position: static; }
 .btn-ready { padding: 12px 40px; font-size: 20px; font-weight: bold; background: linear-gradient(145deg, #ffcc00, #ff9900); border: none; border-radius: 30px; cursor: pointer; color: white; box-shadow: 0 4px 15px rgba(255,153,0,0.5); transition: 0.2s; }
 .btn-ready:active { transform: scale(0.95); }
 
@@ -2060,7 +2061,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .info-iframe { width: 100%; height: 100%; border: none; }
 .info-video-wrap { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #000; position: relative; }
 .info-video { width: 100%; height: 100%; object-fit: contain; outline: none; }
-.info-text { padding: 60px 40px 60px; color: #ccc; height: 100%; overflow-y: auto; box-sizing: border-box; }
+.info-text { padding: 40px 40px 60px; color: #ccc; height: 100%; overflow-y: auto; box-sizing: border-box; }
 .info-text h3 { color: #ffd700; font-size: 22px; margin: 0 auto 24px; text-align: center; display: block; width: 100%; }
 .info-text h4 { color: #ddd; font-size: 15px; margin: 18px 0 8px; }
 .info-text p { font-size: 13px; line-height: 1.8; margin: 0 0 12px; color: #aaa; }
@@ -2080,7 +2081,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 }
 
 .lobby-dialog { text-align: center; color: white; padding: 20px; }
-.lobby-dialog h2 { font-size: 22px; margin-bottom: 18px; color: #ffd700; }
+.lobby-dialog h2 { font-size: 22px; margin-bottom: 18px; color: #ffd700; font-family: 'Microsoft YaHei', '微软雅黑', sans-serif; font-weight: bold; }
 .lobby-input { display: block; width: 220px; margin: 10px auto; padding: 10px 14px; font-size: 16px; border: 2px solid #555; border-radius: 10px; background: rgba(255,255,255,0.1); color: white; text-align: center; outline: none; }
 .lobby-input:focus { border-color: #ffd700; }
 .lobby-input.room-code { font-size: 24px; letter-spacing: 8px; text-transform: uppercase; }
@@ -2092,8 +2093,8 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .nick-btn:hover { background: rgba(255,255,255,0.18); color: #ffd700; border-color: #ffd700; }
 /* 记忆弹出框 */
 .memory-wrap { position: relative; }
-.memory-popup { position: absolute; left: 0; bottom: 44px; background: #1a1a2e; border: 1px solid #444; border-radius: 8px; padding: 6px; display: flex; flex-wrap: wrap; gap: 4px; width: 130px; z-index: 99; }
-.memory-chip { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #ddd; font-size: 12px; padding: 4px 8px; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+.memory-popup { position: absolute; right: calc(100% + 8px); top: 0; background: #1a1a2e; border: 1px solid #444; border-radius: 8px; padding: 8px; display: flex; flex-wrap: wrap; gap: 5px; width: 140px; z-index: 99; justify-content: center; }
+.memory-chip { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; color: #ddd; font-size: 13px; padding: 5px 10px; cursor: pointer; transition: all 0.15s; white-space: nowrap; text-align: center; }
 .memory-chip:hover { background: #ffd700; color: #1a1a2e; border-color: #ffd700; }
 .lobby-btn { display: block; width: 250px; margin: 10px auto; padding: 12px; font-size: 16px; font-weight: bold; border: none; border-radius: 12px; cursor: pointer; color: white; transition: 0.2s; }
 .lobby-btn.create { background: linear-gradient(145deg, #4CAF50, #2E7D32); }
@@ -2307,9 +2308,9 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .dihu-btn:active { transform: scale(0.95); }
 
 /* ===== 顶部控制栏（BGM / 语音 / 聊天，在游戏区域内） ===== */
-.top-controls { position: absolute; top: 28px; right: 100px; z-index: 99999; display: flex; gap: 3px; }
+.top-controls { position: absolute; top: 20px; right: 100px; z-index: 99999; display: flex; gap: 3px; }
 /* 首页：BGM按钮居中略偏左，不挡"桃"字 */
-.top-controls { position: absolute; top: 28px; right: 100px; z-index: 99999; display: flex; gap: 3px; }
+.top-controls { position: absolute; top: 20px; right: 100px; z-index: 99999; display: flex; gap: 3px; }
 .ctrl-btn { background: rgba(0,0,0,0.4); color: white; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 2px 6px; font-size: 15px; cursor: pointer; display: flex; align-items: center; gap: 2px; }
 .ctrl-btn:hover { background: rgba(0,0,0,0.7); }
 
