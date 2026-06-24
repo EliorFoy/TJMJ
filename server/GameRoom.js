@@ -284,7 +284,14 @@ export class GameRoom {
     if (actions.chi !== null) relevantPlayers.add(actions.chi);
 
     const responderCount = relevantPlayers.size;
-    this.pendingActions = { actions, actionResponded: 0, actionResults: [], responderCount };
+    // 超时自动跳过（15 秒未响应则全部 pass，防止断线卡死）
+    const timeoutId = setTimeout(() => {
+      if (this.pendingActions === pa) {
+        console.log('[服务器] 操作超时，自动跳过');
+        this.resolveActions();
+      }
+    }, 15000);
+    this.pendingActions = { actions, actionResponded: 0, actionResults: [], responderCount, timeoutId };
 
     relevantPlayers.forEach(p => {
       this.sendTo(p, {
@@ -310,6 +317,7 @@ export class GameRoom {
   resolveActions() {
     if (!this.pendingActions) return;
     const pa = this.pendingActions;
+    if (pa.timeoutId) clearTimeout(pa.timeoutId);
     const { actions, actionResults } = pa;
     this.pendingActions = null;
 

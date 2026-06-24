@@ -918,20 +918,19 @@ const rtcConfig = {
 };
 
 // 启动音量监测
-let _micCtxInit = false;
 const startMicLevelMonitor = (stream) => {
   try {
+    // 断开旧的 analyser（如果有）
+    if (analyserNode) {
+      try { analyserNode.disconnect(); } catch(e) {}
+      analyserNode = null;
+    }
     if (!_micCtx) {
       _micCtx = new (window.AudioContext || window.webkitAudioContext)();
     }
-    // iOS 需要显式 resume，且每次切换页面回来都可能被 suspend
     if (_micCtx.state === 'suspended') {
-      _micCtx.resume().then(() => {
-        console.log('[语音] AudioContext 已恢复');
-      }).catch(() => {});
+      _micCtx.resume().catch(() => {});
     }
-    if (_micCtxInit) return; // 已经初始化过，避免重复创建节点
-    _micCtxInit = true;
     analyserNode = _micCtx.createAnalyser();
     analyserNode.fftSize = 256;
     const source = _micCtx.createMediaStreamSource(stream);
