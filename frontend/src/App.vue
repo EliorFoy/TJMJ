@@ -383,6 +383,7 @@ import { connect, send, on, off, netState, disconnect, netLatency } from './netw
 // 【核心解法】动态读取环境路径，彻底消灭 404！
 const BASE = import.meta.env.BASE_URL;
 const getImg = (path) => {
+  if (path && (path.startsWith('data:') || path.startsWith('http') || path.startsWith('blob:'))) return path;
   return `${BASE}images/${path}`;
 };
 
@@ -2454,8 +2455,8 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .avatar-img.clickable:hover { transform: scale(1.15); filter: brightness(1.2); transition: 0.2s; }
 
 /* 头像选择器 */
-.avatar-picker-overlay { position: fixed !important; inset: 0 !important; background: rgba(0,0,0,0.3) !important; z-index: 2147483647 !important; display: flex !important; align-items: center !important; justify-content: center !important; }
-.avatar-picker-panel { background: #1a1a2e; border: 2px solid #ffd700; border-radius: 8px; padding: 10px; text-align: center; max-width: 200px; width: 70vw; }
+.avatar-picker-overlay { position: fixed !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; background: rgba(0,0,0,0.3) !important; z-index: 2147483647 !important; display: flex !important; align-items: center !important; justify-content: center !important; }
+.avatar-picker-panel { background: #1a1a2e; border: 2px solid #ffd700; border-radius: 8px; padding: 10px; text-align: center; max-width: 200px !important; width: 200px !important; }
 .avatar-picker-panel h3 { color: #ffd700; margin: 0 0 6px; font-size: 13px; }
 .avatar-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 8px; }
 .avatar-option { width: 100%; aspect-ratio: 1; border-radius: 6px; border: 2px solid #444; cursor: pointer; background: #fff; object-fit: cover; }
