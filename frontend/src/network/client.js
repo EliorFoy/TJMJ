@@ -149,18 +149,33 @@ export const send = (msg) => {
   }
 };
 
-// 心跳（保持连接活跃，防 NAT 超时断开）
+// 心跳（保持连接活跃，防 NAT 超时断开）+ 延迟测量
 let heartbeatTimer = null;
+let pingSentTime = 0;
+export const netLatency = reactive({ ms: 0, level: 0 }); // 0=离线 1-4=信号格数
 const startHeartbeat = () => {
   stopHeartbeat();
   heartbeatTimer = setInterval(() => {
     if (ws && ws.readyState === WebSocket.OPEN) {
+      pingSentTime = Date.now();
       send({ type: 'ping' });
+    } else {
+      netLatency.level = 0;
     }
-  }, 25000); // 每 25 秒 ping 一次
+  }, 10000); // 每 10 秒测一次
 };
 const stopHeartbeat = () => {
   if (heartbeatTimer) { clearInterval(heartbeatTimer); heartbeatTimer = null; }
+};
+
+// 更新延迟等级
+const updateLatency = (ms) => {
+  netLatency.ms = ms;
+  if (ms <= 0) netLatency.level = 0;
+  else if (ms < 100) netLatency.level = 4;
+  else if (ms < 200) netLatency.level = 3;
+  else if (ms < 400) netLatency.level = 2;
+  else netLatency.level = 1;
 };
 
 // 事件监听
@@ -195,7 +210,7 @@ const handleMessage = (msg) => {
       break;
 
     case 'pong':
-      // 心跳回复，连接正常
+      updateLatency(Date.now() - pingSentTime);
       break;
 
     case 'error':

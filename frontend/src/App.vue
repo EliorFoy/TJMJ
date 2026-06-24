@@ -13,6 +13,9 @@
 
         <!-- 左上角刷新按钮（仅在游戏中显示） -->
         <button class="refresh-btn" v-if="!isInMenu && gameMode === 'multi'" @click="safeRefresh" title="刷新房间">↻</button>
+        <span class="net-signal" v-if="!isInMenu && gameMode === 'multi'" :title="'延迟: ' + netLatency.ms + 'ms'">
+          <span v-for="n in 4" :key="n" class="net-bar" :class="{ active: netLatency.level >= n }"></span>
+        </span>
 
         <!-- 控制按钮：游戏中显示全部 -->
         <div class="top-controls">
@@ -375,7 +378,7 @@ import { HuCalculator } from './core/HuCalculator.js';
 import { RuleChecker } from './core/RuleChecker.js';
 import { NpcStrategy } from './ai/NpcStrategy.js';
 import { speak, playDong, playWin, speakTile } from './utils/speech.js';
-import { connect, send, on, off, netState, disconnect } from './network/client.js';
+import { connect, send, on, off, netState, disconnect, netLatency } from './network/client.js';
 
 // 【核心解法】动态读取环境路径，彻底消灭 404！
 const BASE = import.meta.env.BASE_URL;
@@ -1523,8 +1526,7 @@ const startRound = () => {
     else gameState.npcHands[player].push(tile);
   }
 
-  gameState.handTiles.sort((a,b)=>a-b);
-  gameState.npcHands.forEach(hand => hand.sort((a,b)=>a-b));
+  // 不排序，保留发牌自然顺序（玩家可拖拽自定义排列）
   // 庄家14张，闲家13张
   gameState.npcTileCounts = [13, 13, 13, 13];
   gameState.npcTileCounts[dealer] = 14;
@@ -2526,12 +2528,26 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 /* 左上角刷新按钮 */
 .refresh-btn { position: absolute; top: 8px; left: 12px; z-index: 99999; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #aaa; font-size: 18px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
 .refresh-btn:hover { background: rgba(0,0,0,0.6); color: #ffd700; border-color: #ffd700; }
+
+/* 网络信号 */
+.net-signal { position: absolute; top: 14px; left: 48px; z-index: 99999; display: flex; align-items: flex-end; gap: 2px; height: 18px; }
+.net-bar { width: 4px; border-radius: 1px; background: #333; transition: background 0.3s; }
+.net-bar:nth-child(1) { height: 5px; } .net-bar:nth-child(2) { height: 9px; }
+.net-bar:nth-child(3) { height: 13px; } .net-bar:nth-child(4) { height: 17px; }
+.net-bar.active { background: #4CAF50; }
 /* 首页：BGM按钮居中略偏左，不挡"桃"字 */
 .top-controls { position: absolute; top: 10px; right: 100px; z-index: 99999; display: flex; gap: 3px; }
 
 /* 左上角刷新按钮 */
 .refresh-btn { position: absolute; top: 8px; left: 12px; z-index: 99999; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: #aaa; font-size: 18px; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
 .refresh-btn:hover { background: rgba(0,0,0,0.6); color: #ffd700; border-color: #ffd700; }
+
+/* 网络信号 */
+.net-signal { position: absolute; top: 14px; left: 48px; z-index: 99999; display: flex; align-items: flex-end; gap: 2px; height: 18px; }
+.net-bar { width: 4px; border-radius: 1px; background: #333; transition: background 0.3s; }
+.net-bar:nth-child(1) { height: 5px; } .net-bar:nth-child(2) { height: 9px; }
+.net-bar:nth-child(3) { height: 13px; } .net-bar:nth-child(4) { height: 17px; }
+.net-bar.active { background: #4CAF50; }
 .ctrl-btn { background: rgba(0,0,0,0.4); color: white; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 2px 6px; font-size: 15px; cursor: pointer; display: flex; align-items: center; gap: 2px; }
 .ctrl-btn:hover { background: rgba(0,0,0,0.7); }
 
