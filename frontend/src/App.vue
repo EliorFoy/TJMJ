@@ -375,7 +375,7 @@ const musicPlaying = ref(false);
 
 // ===== BGM 歌单系统 =====
 const HOME_SONGS = ['bgm羊了个羊.mp3', 'bgm捂嘴手势舞.mp3'];
-const GAME_SONGS = ['1.PVZ.mp3','2.搞怪.mp3','3.恭喜发财.mp3','4.滑稽.mp3','5.鸡.mp3','6.嫉妒与愤怒钢琴.mp3','7.浪漫华尔兹.mp3','8.燃起来.mp3','9.温柔吉他.mp3'];
+const GAME_SONGS = ['1.mp3','2.mp3','3.mp3','4.mp3','5.mp3','6.mp3','7.mp3','8.mp3','9.mp3'];
 const currentPlaylist = ref('home'); // 'home' | 'game'
 const gameGenre = ref('default'); // 'default' | 'o'
 const O_SONGS = ['oskarpianist/不为谁而作的歌.mp3','oskarpianist/我记得.mp3','oskarpianist/暮色回响.mp3','oskarpianist/曹操.mp3','oskarpianist/枫.mp3','oskarpianist/海阔天空.mp3','oskarpianist/起风了.mp3'];
