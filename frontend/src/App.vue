@@ -56,6 +56,41 @@
             <button class="mode-btn" @click="enterGame('multi')">联机模式</button>
             <button class="mode-btn" @click="enterGame('spectate')">观战模式</button>
             <button class="mode-btn test-mode-btn" @click="enterGame('test')" :disabled="isMobileDevice" :title="isMobileDevice ? '测试模式仅支持电脑端' : ''">测试模式</button>
+            <div class="info-links">
+              <a class="info-link" @click="openInfo('manual')">教程文档</a>
+              <a class="info-link" @click="openInfo('video')">演示视频</a>
+              <a class="info-link" @click="openInfo('disclaimer')">使用协议</a>
+            </div>
+          </div>
+        </div>
+
+        <!-- 内容弹窗（教程/视频/协议） -->
+        <div class="info-overlay" v-if="infoOverlay" @click.self="closeInfo">
+          <div class="info-panel">
+            <button class="info-close" @click="closeInfo">✕</button>
+            <!-- 教程文档 -->
+            <iframe v-if="infoOverlay === 'manual'" src="/TJMJ/docs/TJMJ_Technical_Manual.pdf" class="info-iframe" frameborder="0"></iframe>
+            <!-- 演示视频 -->
+            <div v-if="infoOverlay === 'video'" class="info-video-wrap">
+              <video src="/showcase.mp4" controls autoplay class="info-video" controlsList="nodownload"></video>
+            </div>
+            <!-- 使用协议 -->
+            <div v-if="infoOverlay === 'disclaimer'" class="info-text">
+              <h3>使用协议 / 免责声明</h3>
+              <div class="disclaimer-body">
+                <p>桃江麻将 TJMJ（以下简称"本软件"）是一款仅供个人娱乐和学习用途的网页麻将游戏。</p>
+                <h4>一、禁止赌博</h4>
+                <p>本软件严禁用于任何形式的赌博活动。本软件中的"计分"仅为游戏内娱乐性积分，不涉及任何真实货币或财物交易。任何利用本软件进行赌博的行为均与本软件开发者无关，相关法律责任由行为人自行承担。</p>
+                <h4>二、仅供娱乐</h4>
+                <p>本软件仅供家人朋友娱乐休闲使用，所有游戏规则及实现仅供参考，实际游玩请以当地线下规则为准。</p>
+                <h4>三、免责条款</h4>
+                <p>开发者不保证本软件的完整性、可靠性或适用性。因使用或无法使用本软件所产生的任何直接或间接损失（包括但不限于数据丢失、设备损坏、财产损失），开发者不承担任何责任。</p>
+                <h4>四、二次开发</h4>
+                <p>本项目完全开源，欢迎 Fork / Star / Pull Request。二次开发者须遵守本协议条款，且须在其衍生作品中保留本免责声明。</p>
+                <h4>五、协议更新</h4>
+                <p>开发者保留随时更新本协议的权利，更新后的协议将在本页面公布即生效。</p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -956,6 +991,17 @@ const openTestMode = () => {
 
 // 自动加入逻辑（URL参数）
 const autoConnecting = ref(false);
+const infoOverlay = ref(null); // null | 'manual' | 'video' | 'disclaimer'
+
+const openInfo = (type) => {
+  infoOverlay.value = type;
+  // 弹窗内容以竖屏阅读为佳，暂时解锁方向
+  unlockOrientation();
+};
+const closeInfo = () => {
+  infoOverlay.value = null;
+  // 回到主菜单维持自由方向，只有进游戏模式才锁横屏
+};
 onMounted(async () => {
   updateGameScale();
   // 首页BGM：首次用户点击时启动（浏览器要求用户手势才能播放）
@@ -1973,6 +2019,30 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
   75%  { transform: translateY(-8px) scale(1.15) rotate(5deg); opacity: 1; }
 }
 
+/* 首页底部教程链接 */
+.info-links { display: flex; justify-content: center; gap: 28px; margin-top: 22px; }
+.info-link { font-size: 13px; color: #aaa; cursor: pointer; text-decoration: none; transition: color 0.2s; }
+.info-link:hover { color: #ffd700; text-decoration: underline; }
+
+/* 内容弹窗（竖屏，右上X关闭） */
+.info-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.92); z-index: 999999; display: flex; align-items: center; justify-content: center; }
+.info-panel { position: relative; width: 90vw; max-width: 800px; height: 90vh; background: #1a1a2e; border-radius: 12px; overflow: hidden; }
+.info-close { position: absolute; top: 12px; right: 16px; z-index: 10; background: rgba(255,255,255,0.1); border: none; color: white; font-size: 22px; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
+.info-close:hover { background: rgba(255,255,255,0.3); }
+.info-iframe { width: 100%; height: 100%; border: none; }
+.info-video-wrap { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: #000; }
+.info-video { max-width: 100%; max-height: 100%; outline: none; }
+.info-text { padding: 50px 40px 40px; color: #ccc; height: 100%; overflow-y: auto; }
+.info-text h3 { color: #ffd700; font-size: 20px; margin-bottom: 24px; text-align: center; }
+.info-text h4 { color: #ddd; font-size: 15px; margin: 18px 0 8px; }
+.info-text p { font-size: 13px; line-height: 1.8; margin: 0 0 12px; color: #aaa; }
+
+/* 手机端弹窗适配 */
+@media screen and (max-width: 1024px) {
+  .info-panel { width: 96vw; height: 85vh; }
+  .info-text { padding: 40px 20px 20px; }
+}
+
 .lobby-dialog { text-align: center; color: white; padding: 20px; }
 .lobby-dialog h2 { font-size: 22px; margin-bottom: 18px; color: #ffd700; }
 .lobby-input { display: block; width: 220px; margin: 10px auto; padding: 10px 14px; font-size: 16px; border: 2px solid #555; border-radius: 10px; background: rgba(255,255,255,0.1); color: white; text-align: center; outline: none; }
@@ -2191,8 +2261,8 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 
 /* ===== 顶部控制栏（BGM / 语音 / 聊天，在游戏区域内） ===== */
 .top-controls { position: absolute; top: 28px; right: 100px; z-index: 99999; display: flex; gap: 3px; }
-/* 首页：BGM按钮居中 */
-.top-controls.menu-only { right: 50%; transform: translateX(50%); gap: 0; }
+/* 首页：BGM按钮居中略偏左，不挡"桃"字 */
+.top-controls.menu-only { right: 50%; transform: translateX(calc(50% - 80px)); gap: 0; }
 .ctrl-btn { background: rgba(0,0,0,0.4); color: white; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 2px 6px; font-size: 15px; cursor: pointer; display: flex; align-items: center; gap: 2px; }
 .ctrl-btn:hover { background: rgba(0,0,0,0.7); }
 
