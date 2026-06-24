@@ -2454,17 +2454,15 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .avatar-img.clickable:hover { transform: scale(1.15); filter: brightness(1.2); transition: 0.2s; }
 
 /* 头像选择器 */
-.avatar-picker-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; height: 100dvh; background: rgba(0,0,0,0.3); z-index: 9999999; display: flex; align-items: center; justify-content: center; }
-.avatar-picker-panel { background: #1a1a2e; border: 2px solid #ffd700; border-radius: 10px; padding: 14px; text-align: center; max-width: 240px; width: 80vw; margin: auto; }
-.avatar-picker-panel h3 { color: #ffd700; margin: 0 0 8px; font-size: 14px; }
-.avatar-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-bottom: 10px; }
-.avatar-option { width: 100%; aspect-ratio: 1; border-radius: 8px; border: 2px solid #444; cursor: pointer; background: #fff; object-fit: cover; transition: 0.15s; }
-.avatar-option:hover { border-color: #ffd700; transform: scale(1.08); }
-.avatar-picker-actions { display: flex; gap: 5px; justify-content: center; flex-wrap: wrap; }
-.avatar-action-btn { background: rgba(255,255,255,0.1); border: 1px solid #555; border-radius: 6px; color: #ddd; padding: 4px 10px; font-size: 12px; cursor: pointer; transition: 0.15s; }
+.avatar-picker-overlay { position: fixed !important; inset: 0 !important; background: rgba(0,0,0,0.3) !important; z-index: 2147483647 !important; display: flex !important; align-items: center !important; justify-content: center !important; }
+.avatar-picker-panel { background: #1a1a2e; border: 2px solid #ffd700; border-radius: 8px; padding: 10px; text-align: center; max-width: 200px; width: 70vw; }
+.avatar-picker-panel h3 { color: #ffd700; margin: 0 0 6px; font-size: 13px; }
+.avatar-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 8px; }
+.avatar-option { width: 100%; aspect-ratio: 1; border-radius: 6px; border: 2px solid #444; cursor: pointer; background: #fff; object-fit: cover; }
+.avatar-picker-actions { display: flex; gap: 4px; justify-content: center; }
+.avatar-action-btn { background: rgba(255,255,255,0.15); border: 1px solid #555; border-radius: 5px; color: #ddd; padding: 3px 8px; font-size: 11px; cursor: pointer; }
 .avatar-action-btn:hover { background: #ffd700; color: #1a1a2e; border-color: #ffd700; }
 .avatar-action-btn.cancel { border-color: #666; color: #888; }
-.avatar-action-btn.cancel:hover { background: #444; color: #ccc; border-color: #888; }
 
 /* 动作按钮 */
 .action-buttons { position: absolute; bottom: 85px; right: 10%; display: flex; gap: 5px; z-index: 100; }
