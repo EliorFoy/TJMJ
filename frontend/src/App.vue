@@ -82,7 +82,7 @@
             </div>
             <!-- 演示视频 -->
             <div v-if="infoOverlay === 'video'" class="info-video-wrap">
-              <video :src="`${BASE}docs/showcase.mp4`" controls autoplay class="info-video" controlsList="nodownload"></video>
+              <video :src="`${BASE}docs/showcase.mp4`" controls class="info-video" controlsList="nodownload nofullscreen" disableRemotePlayback></video>
             </div>
             <!-- 使用协议 -->
             <div v-if="infoOverlay === 'disclaimer'" class="info-text">
@@ -1974,7 +1974,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 
 /* 模式选择 + 联机大厅 */
 .mode-select-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; z-index: 999; }
-.mode-dialog { text-align: center; color: white; position: relative; overflow: hidden; transform: scale(1.1); margin-top: -5%; }
+.mode-dialog { text-align: center; color: white; position: relative; overflow: hidden; transform: scale(1.1); margin-top: 2%; }
 .mode-dialog h2 { font-size: 36px; margin-bottom: 18px; color: #4CAF50; font-family: 'Microsoft YaHei', '微软雅黑', sans-serif; font-weight: bold; }
 .mode-btn { display: block; width: 260px; margin: 8px auto; padding: 14px; font-size: 18px; font-weight: bold; border: 2px solid #555; border-radius: 16px; cursor: pointer; background: rgba(255,255,255,0.1); color: white; transition: 0.2s; }
 .mode-btn:hover { background: rgba(255,255,255,0.2); border-color: #ffd700; }
@@ -2036,7 +2036,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 
 /* 内容弹窗（竖屏，右上X关闭） */
 .info-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.92); z-index: 999999; display: flex; align-items: center; justify-content: center; }
-.info-panel { position: relative; width: 90vw; max-width: 800px; height: 90vh; background: #1a1a2e; border-radius: 12px; overflow: hidden; }
+.info-panel { position: relative; width: 100vw; height: 100vh; max-width: none; background: #1a1a2e; border-radius: 0; overflow: hidden; }
 .info-close { position: absolute; top: 12px; right: 16px; z-index: 10; background: rgba(255,255,255,0.1); border: none; color: white; font-size: 22px; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background 0.2s; }
 .info-close:hover { background: rgba(255,255,255,0.3); }
 .info-iframe { width: 100%; height: 100%; border: none; }
@@ -2047,10 +2047,10 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .info-text h4 { color: #ddd; font-size: 15px; margin: 18px 0 8px; }
 .info-text p { font-size: 13px; line-height: 1.8; margin: 0 0 12px; color: #aaa; }
 
-/* 手机端弹窗适配 */
+/* 手机端弹窗适配：保留少量边距 */
 @media screen and (max-width: 1024px) {
-  .info-panel { width: 96vw; height: 85vh; }
-  .info-text { padding: 40px 20px 20px; }
+  .info-panel { width: 100vw; height: 100vh; }
+  .info-text { padding: 50px 20px 60px; }
 }
 
 .lobby-dialog { text-align: center; color: white; padding: 20px; }
