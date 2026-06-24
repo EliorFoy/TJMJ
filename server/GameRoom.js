@@ -114,6 +114,7 @@ export class GameRoom {
   startGame() {
     if (this.players.length < 4) return;
     this.state = 'PLAYING';
+    this.pendingActions = null; // 清除上一局残留
     this.hands = [[], [], [], []];
     this.discards = [];
     this.exposed = [[], [], [], []];
@@ -282,13 +283,15 @@ export class GameRoom {
     if (actions.chi !== null) relevantPlayers.add(actions.chi);
 
     const responderCount = relevantPlayers.size;
-    // 超时自动跳过（15 秒未响应则全部 pass，防止断线卡死）
+    // 超时自动跳过（10 秒未响应则强制清除，防止断线卡死）
     const timeoutId = setTimeout(() => {
-      if (this.pendingActions === pa) {
-        console.log('[服务器] 操作超时，自动跳过');
-        this.resolveActions();
+      // 超时直接重置，不管引用是否匹配
+      if (this.pendingActions) {
+        console.log('[服务器] 操作超时，强制跳过 pendingActions');
+        this.pendingActions = null;
+        this.nextTurn();
       }
-    }, 15000);
+    }, 10000);
     this.pendingActions = { actions, actionResponded: 0, actionResults: [], responderCount, timeoutId };
 
     relevantPlayers.forEach(p => {
