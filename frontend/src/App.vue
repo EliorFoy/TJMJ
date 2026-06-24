@@ -55,7 +55,7 @@
             <button class="mode-btn" @click="enterGame('single')">单人模式</button>
             <button class="mode-btn" @click="enterGame('multi')">联机模式</button>
             <button class="mode-btn" @click="enterGame('spectate')">观战模式</button>
-            <button class="mode-btn test-mode-btn" @click="enterGame('test')" :disabled="isMobileDevice" :title="isMobileDevice ? '测试模式仅支持电脑端' : ''">测试模式</button>
+            <button class="mode-btn test-mode-btn" @click="enterGame('test')" disabled title="测试模式暂未开放">测试模式</button>
             <div class="info-links">
               <a class="info-link" :href="`${BASE}docs/TJMJ_Technical_Manual.pdf`" target="_blank">教程文档</a>
               <a class="info-link" @click="openInfo('video')">演示视频</a>
@@ -578,7 +578,7 @@ const dragOverIndex = ref(-1); // 拖拽悬停的目标索引
 
 // 昵称记忆 & 随机
 const showMemory = ref(false);
-const memoryNames = ['Cjj','Zzw','Xjh','Xjt','Lsy','Syy','Hj','Lem'];
+const memoryNames = ['cjj','zzw','xjh','xjt','lsy','syy','hj','lem'];
 const randomNames = ['祖国人','内向小男孩','乡里人','城里人','花开富贵','奥特曼','如来佛','机器人','最强NPC','AI','路障僵尸','阿强','阿珍','阿贵','超鬼','奥利给','球草','球花'];
 let lastRollIdx = -1;
 const rollNickname = () => {
@@ -760,7 +760,7 @@ const backToMenu = () => {
   stopMusic();
   currentPlaylist.value = 'home';
   gameGenre.value = 'default';
-  setTimeout(() => playRandomFrom('home'), 300); // 切回首页歌单
+  // BGM 默认关闭，手动点击才播放
   // 清理语音连接
   closeAllPeerConnections();
 };
@@ -2064,6 +2064,13 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .info-text h3 { color: #ffd700; font-size: 22px; margin: 0 auto 24px; text-align: center; display: block; width: 100%; }
 .info-text h4 { color: #ddd; font-size: 15px; margin: 18px 0 8px; }
 .info-text p { font-size: 13px; line-height: 1.8; margin: 0 0 12px; color: #aaa; }
+
+/* 桌面端：协议文字放大 125% */
+@media screen and (min-width: 1025px) {
+  .info-text h3 { font-size: 28px; }
+  .info-text h4 { font-size: 19px; }
+  .info-text p { font-size: 16px; }
+}
 
 /* 手机端弹窗适配 */
 @media screen and (max-width: 1024px) {
