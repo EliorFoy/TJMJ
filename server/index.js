@@ -1,12 +1,38 @@
 // server/index.js — WebSocket 游戏服务器入口
 import { WebSocketServer } from 'ws';
 import { GameRoom } from './GameRoom.js';
+import crypto from 'crypto';
 
 const PORT = process.env.PORT || 8080;
 const wss = new WebSocketServer({ port: PORT });
 const rooms = new Map();
 
 console.log(`🀄 TJMJ 服务器已启动，端口 ${PORT}`);
+
+// === Twilio TURN 凭据生成（24h 有效，启动时算一次） ===
+// 设置环境变量: set TWILIO_ACCOUNT_SID=xxx && set TWILIO_AUTH_TOKEN=xxx
+const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || '';
+const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || '';
+const TTL = 86400; // 24 小时
+const HAS_TWILIO = TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN;
+const TURN_CREDENTIALS = HAS_TWILIO ? generateTurnCredentials() : null;
+if (!HAS_TWILIO) console.log('[服务器] ⚠️ 未设置 TWILIO 环境变量，TURN 不可用');
+
+function generateTurnCredentials() {
+  const timestamp = Math.floor(Date.now() / 1000) + TTL;
+  const username = `${timestamp}:${TWILIO_ACCOUNT_SID}`;
+  const hmac = crypto.createHmac('sha1', TWILIO_AUTH_TOKEN);
+  hmac.update(username);
+  const password = hmac.digest('base64');
+  return { username, password };
+}
+
+// 每小时刷新一次
+setInterval(() => {
+  const newCreds = generateTurnCredentials();
+  Object.assign(TURN_CREDENTIALS, newCreds);
+  console.log('[服务器] TURN 凭据已刷新');
+}, 3600000);
 
 wss.on('connection', (ws) => {
   let myRoom = null;
@@ -153,6 +179,23 @@ wss.on('connection', (ws) => {
         if (myRoom && myPlayerIndex >= 0) {
           myRoom.playerReadyForNext(myPlayerIndex);
         }
+        break;
+      }
+
+      // 获取 TURN 凭据
+      case 'get_turn': {
+        const servers = [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+        ];
+        if (HAS_TWILIO && TURN_CREDENTIALS) {
+          servers.push({
+            urls: ['turn:global.turn.twilio.com:3478?transport=udp', 'turn:global.turn.twilio.com:3478?transport=tcp'],
+            username: TURN_CREDENTIALS.username,
+            credential: TURN_CREDENTIALS.password,
+          });
+        }
+        ws.send(JSON.stringify({ type: 'turn_credentials', iceServers: servers }));
         break;
       }
 

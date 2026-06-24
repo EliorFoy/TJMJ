@@ -922,15 +922,29 @@ let analyserNode = null;
 // 麦克风分析器共用 BGM 的 _audioCtx（避免重复上下文）
 let micLevelTimer = null;
 
-const rtcConfig = {
+let rtcConfig = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    // 免费 TURN 服务器，手机 4G/5G NAT 穿透必备
-    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' },
   ]
+};
+
+// 从服务端获取 Twilio TURN 凭据（10GB 免费/月）
+const fetchTurnConfig = async () => {
+  return new Promise((resolve) => {
+    const handler = (msg) => {
+      if (msg.type === 'turn_credentials' && msg.iceServers) {
+        off('turn_credentials', handler);
+        rtcConfig = { iceServers: msg.iceServers };
+        console.log('[语音] TURN 凭据已加载:', msg.iceServers.length, '个服务器');
+        resolve();
+      }
+    };
+    on('turn_credentials', handler);
+    send({ type: 'get_turn' });
+    // 2 秒超时，用默认 STUN 也行
+    setTimeout(() => { off('turn_credentials', handler); resolve(); }, 2000);
+  });
 };
 
 // 启动音量监测
@@ -1264,6 +1278,7 @@ const leaveRoom = () => {
 };
 
 const setupNetworkListeners = () => {
+  fetchTurnConfig(); // 异步获取 TURN 凭据
   on('room_created', (msg) => {
     multiState.roomId = msg.roomId;
     rememberRoomInUrl(msg.roomId);
