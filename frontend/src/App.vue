@@ -1323,6 +1323,7 @@ const handleWebrtcSignal = (msg) => {
     }
     pc.setRemoteDescription(new RTCSessionDescription(data)).then(() => {
       console.log('[语音] setRemote成功(offer) 来自=' + from);
+      flushIceBuffer(); // 刷入之前缓冲的ICE候选
       return pc.createAnswer();
     }).then(answer => {
       return pc.setLocalDescription(answer);
@@ -1336,6 +1337,7 @@ const handleWebrtcSignal = (msg) => {
     if (pc) {
       pc.setRemoteDescription(new RTCSessionDescription(data)).then(() => {
         console.log('[语音] setRemote成功(answer) 来自=' + from);
+        flushIceBuffer(); // 立即刷入之前缓冲的ICE候选
       }).catch(e => {
         console.error('[语音] setRemote失败(answer) 来自=' + from, e.message);
       });
