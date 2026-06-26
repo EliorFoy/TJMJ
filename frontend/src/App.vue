@@ -1017,7 +1017,7 @@ const addChatMessage = (msg) => {
 // ============ Agora 声网语音 ============
 // 免费额度：10,000分钟/月，4人麻将完全够用
 // 注册获取APP_ID: https://console.agora.io
-const AGORA_APP_ID = '请替换为你的Agora_APP_ID'; // https://console.agora.io 免费注册获取
+const AGORA_APP_ID = '8b1312a44b5e425ca8954a6e7bbf1f5d';
 const micEnabled = ref(false);
 const micLevel = ref(0);
 let agoraClient = null;
