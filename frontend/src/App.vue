@@ -1040,20 +1040,26 @@ const initAgoraClient = () => {
   });
 };
 
-// 向服务端请求Agora Token（无Token时直接用App ID模式）
+// 向服务端请求Agora Token
+// 若服务端返回空(无证书)则用null尝试App ID模式
 const fetchAgoraToken = (roomId) => {
   return new Promise((resolve) => {
     const handler = (msg) => {
       if (msg.type === 'agora_token') {
         off('agora_token', handler);
-        console.log('[语音] 收到Token: ' + (msg.token ? '有(' + msg.token.substring(0,20) + '...)' : '无(使用App ID模式)'));
-        resolve(msg.token || null);
+        if (msg.token) {
+          console.log('[语音] Token=' + msg.token.substring(0,30) + '...');
+          resolve(msg.token);
+        } else {
+          console.log('[语音] 服务端无证书，尝试App ID无Token模式');
+          resolve(null);
+        }
       }
     };
     on('agora_token', handler);
     const uid = netState.playerIndex + 1;
     send({ type: 'get_agora_token', channel: 'tjmj_' + roomId, uid });
-    setTimeout(() => { off('agora_token', handler); console.log('[语音] Token请求超时，使用无Token模式'); resolve(null); }, 5000);
+    setTimeout(() => { off('agora_token', handler); console.log('[语音] Token请求超时'); resolve(null); }, 5000);
   });
 };
 

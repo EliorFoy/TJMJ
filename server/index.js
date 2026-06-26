@@ -23,10 +23,11 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 const { RtcTokenBuilder, RtcRole } = require('agora-access-token');
 const AGORA_APP_ID = process.env.AGORA_APP_ID || '8b1312a44b5e425ca8954a6e7bbf1f5d';
-const AGORA_APP_CERT = process.env.AGORA_APP_CERT || '';
-const HAS_AGORA = AGORA_APP_ID && AGORA_APP_CERT;
-if (!HAS_AGORA) console.log('[服务器] ⚠️ 未设置 AGORA_APP_CERT 环境变量，将使用无Token模式（仅限测试）');
-if (HAS_AGORA) console.log('[服务器] ✓ Agora Token 服务已就绪');
+const AGORA_APP_CERT = (process.env.AGORA_APP_CERT || '').trim();
+const HAS_AGORA = !!(AGORA_APP_ID && AGORA_APP_CERT);
+console.log('[服务器] Agora APP_ID=' + AGORA_APP_ID.substring(0,8) + '... CERT=' + (AGORA_APP_CERT ? AGORA_APP_CERT.substring(0,8) + '...' : '(未设置)'));
+if (!HAS_AGORA) console.log('[服务器] ⚠️ 未设置 AGORA_APP_CERT，Token不可用');
+if (HAS_AGORA) console.log('[服务器] ✓ Agora Token 服务已就绪，CERT长度=' + AGORA_APP_CERT.length);
 
 function generateAgoraToken(channelName, uid = 0) {
   if (!HAS_AGORA) return null;
