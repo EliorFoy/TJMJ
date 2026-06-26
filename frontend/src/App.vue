@@ -1018,32 +1018,33 @@ const micEnabled = ref(false);
 const micLevel = ref(0); // 0-100 音量百分比
 const localStream = ref(null);
 const peerConnections = new Map(); // playerIndex → RTCPeerConnection
+const remoteAudios = new Map();    // playerIndex → HTMLAudioElement (防GC)
 let analyserNode = null;
-// 麦克风分析器共用 BGM 的 _audioCtx（避免重复上下文）
 let micLevelTimer = null;
+let _turnReady = false; // TURN凭据是否已加载
 
+// 从服务端获取 Twilio TURN 凭据（10GB 免费/月）
 let rtcConfig = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
   ]
 };
-
-// 从服务端获取 Twilio TURN 凭据（10GB 免费/月）
 const fetchTurnConfig = async () => {
   return new Promise((resolve) => {
     const handler = (msg) => {
       if (msg.type === 'turn_credentials' && msg.iceServers) {
         off('turn_credentials', handler);
         rtcConfig = { iceServers: msg.iceServers };
+        _turnReady = true;
         console.log('[语音] TURN 凭据已加载:', msg.iceServers.length, '个服务器');
         resolve();
       }
     };
     on('turn_credentials', handler);
     send({ type: 'get_turn' });
-    // 2 秒超时，用默认 STUN 也行
-    setTimeout(() => { off('turn_credentials', handler); resolve(); }, 2000);
+    // 3 秒超时，用默认 STUN
+    setTimeout(() => { off('turn_credentials', handler); _turnReady = true; resolve(); }, 3000);
   });
 };
 
@@ -1114,23 +1115,27 @@ const toggleMic = async () => {
   }
 };
 
-const setupVoiceWithRoom = () => {
+const setupVoiceWithRoom = async () => {
   if (!localStream.value) return;
   if (!netState.players || netState.players.length < 2) {
     setTimeout(() => setupVoiceWithRoom(), 800);
     return;
   }
+  // 等待 TURN 凭据就绪后再建连（否则移动4G/5G无法穿透NAT）
+  if (!_turnReady) {
+    console.log('[语音] 等待TURN凭据...');
+    setTimeout(() => setupVoiceWithRoom(), 500);
+    return;
+  }
   const myIdx = netState.playerIndex;
   myPlayerIndexForChat.value = myIdx;
-  // 增量更新：只连接新玩家，不断开已有连接
   const currentPeers = new Set(peerConnections.keys());
   netState.players.forEach((p, i) => {
-    if (i !== myIdx) {
+    if (i !== myIdx && p.connected) {
       if (!currentPeers.has(i)) {
         createPeerConnection(i, myIdx < i);
-        console.log('[语音] 创建P2P连接: 我=' + myIdx + ' → 对方=' + i);
+        console.log('[语音] 创建P2P连接: 我=' + myIdx + ' → 对方=' + i + ' iceServers=' + rtcConfig.iceServers.length);
       } else {
-        // 已有连接：替换音轨（麦克风重新打开时更新）
         const pc = peerConnections.get(i);
         if (pc && localStream.value) {
           pc.getSenders().forEach(s => pc.removeTrack(s));
@@ -1141,12 +1146,12 @@ const setupVoiceWithRoom = () => {
       }
     }
   });
-  // 清理已离开的玩家
-  const activePlayerIds = new Set(netState.players.map((_, i) => i));
+  const activePlayerIds = new Set(netState.players.filter(p => p.connected).map((_, i) => i));
   peerConnections.forEach((pc, id) => {
     if (!activePlayerIds.has(id)) {
       try { pc.close(); } catch(e) {}
       peerConnections.delete(id);
+      const a = remoteAudios.get(id); if (a) { a.pause(); a.remove(); remoteAudios.delete(id); }
       console.log('[语音] 移除断线玩家:', id);
     }
   });
@@ -1167,18 +1172,39 @@ const createPeerConnection = (targetIdx, isOfferer = true) => {
   };
   pc.oniceconnectionstatechange = () => {
     console.log('[语音] ICE状态 对方=' + targetIdx + ': ' + pc.iceConnectionState);
+    // ICE断开后尝试重建
+    if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
+      console.log('[语音] ICE断开 对方=' + targetIdx + '，将尝试重建...');
+      try { pc.close(); } catch(e) {}
+      peerConnections.delete(targetIdx);
+      const a = remoteAudios.get(targetIdx); if (a) { a.pause(); a.remove(); remoteAudios.delete(targetIdx); }
+      // 延迟重建
+      setTimeout(() => {
+        if (micEnabled.value && netState.roomId) {
+          createPeerConnection(targetIdx, netState.playerIndex < targetIdx);
+        }
+      }, 2000);
+    }
   };
 
   pc.ontrack = (e) => {
-    // 远端音频
     try {
-      const remoteStream = new MediaStream();
-      remoteStream.addTrack(e.track);
-      const audio = new Audio();
-      audio.srcObject = remoteStream;
-      audio.autoplay = true;
-      audio.play().catch(() => {});
-    } catch(err) { console.log('音频播放失败:', err); }
+      let audio = remoteAudios.get(targetIdx);
+      if (!audio) {
+        audio = new Audio();
+        audio.srcObject = e.streams[0] || new MediaStream([e.track]);
+        audio.autoplay = true;
+        audio.volume = 1.0;
+        remoteAudios.set(targetIdx, audio);
+      } else if (!audio.srcObject) {
+        audio.srcObject = e.streams[0] || new MediaStream([e.track]);
+      }
+      audio.play().catch(() => {
+        const resume = () => { audio.play().catch(()=>{}); document.removeEventListener('click', resume); };
+        document.addEventListener('click', resume, { once: true });
+      });
+      console.log('[语音] 远端音频就绪: 来自玩家' + targetIdx);
+    } catch(err) { console.log('[语音] 音频播放失败:', err); }
   };
 
   // 只由 playerIndex 较小的一方创建 offer（避免双方同时 offer 冲突）
@@ -1211,13 +1237,22 @@ const handleWebrtcSignal = (msg) => {
       };
       pc.ontrack = (e) => {
         try {
-          const remoteStream = new MediaStream();
-          remoteStream.addTrack(e.track);
-          const audio = new Audio();
-          audio.srcObject = remoteStream;
-          audio.autoplay = true;
-          audio.play().catch(() => {});
-        } catch(err) {}
+          let audio = remoteAudios.get(from);
+          if (!audio) {
+            audio = new Audio();
+            audio.srcObject = e.streams[0] || new MediaStream([e.track]);
+            audio.autoplay = true;
+            audio.volume = 1.0;
+            remoteAudios.set(from, audio);
+          } else if (!audio.srcObject) {
+            audio.srcObject = e.streams[0] || new MediaStream([e.track]);
+          }
+          audio.play().catch(() => {
+            const resume = () => { audio.play().catch(()=>{}); document.removeEventListener('click', resume); };
+            document.addEventListener('click', resume, { once: true });
+          });
+          console.log('[语音] 远端音频就绪(应答): 来自玩家' + from);
+        } catch(err) { console.log('[语音] 应答音频失败:', err); }
       };
     }
     pc.setRemoteDescription(new RTCSessionDescription(data));
@@ -1237,15 +1272,16 @@ const closeAllPeerConnections = () => {
     try { pc.close(); } catch(e) {}
   });
   peerConnections.clear();
-  // 停止本地麦克风轨道，释放资源
+  remoteAudios.forEach(a => { try { a.pause(); a.remove(); } catch(e) {} });
+  remoteAudios.clear();
   if (localStream.value) {
     localStream.value.getTracks().forEach(t => t.stop());
     localStream.value = null;
   }
-  // 暂停 AudioContext（iOS 要求）
   if (_micCtx) {
     try { _micCtx.suspend(); } catch(e) {}
   }
+  _turnReady = false;
 };
 
 const spectateRoomInput = ref('');
