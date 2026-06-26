@@ -226,9 +226,10 @@ wss.on('connection', (ws) => {
 
       // Agora Token 获取
       case 'get_agora_token': {
-        const token = generateAgoraToken(msg.channel || 'tjmj_test', 0);
+        const uid = parseInt(msg.uid) || 1;
+        const token = generateAgoraToken(msg.channel || 'tjmj_test', uid);
         ws.send(JSON.stringify({ type: 'agora_token', token }));
-        console.log('[服务器] Agora Token已生成: channel=' + msg.channel + ' hasToken=' + !!token);
+        console.log('[服务器] Agora Token: channel=' + msg.channel + ' uid=' + uid + ' token=' + (token ? token.substring(0,30)+'...' : 'null'));
         break;
       }
 

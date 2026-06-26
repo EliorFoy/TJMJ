@@ -1051,7 +1051,8 @@ const fetchAgoraToken = (roomId) => {
       }
     };
     on('agora_token', handler);
-    send({ type: 'get_agora_token', channel: 'tjmj_' + roomId });
+    const uid = netState.playerIndex + 1;
+    send({ type: 'get_agora_token', channel: 'tjmj_' + roomId, uid });
     setTimeout(() => { off('agora_token', handler); console.log('[语音] Token请求超时，使用无Token模式'); resolve(null); }, 5000);
   });
 };
@@ -1067,7 +1068,8 @@ const joinAgoraChannel = async (roomId) => {
     const token = await fetchAgoraToken(roomId);
     const channel = 'tjmj_' + roomId;
     console.log('[语音] 正在加入频道: ' + channel + ' appId=' + AGORA_APP_ID.substring(0,8) + '... token=' + (token ? '有('+token.substring(0,20)+'...)' : '无'));
-    await agoraClient.join(AGORA_APP_ID, channel, token || null, null);
+    const uid = netState.playerIndex + 1; // 座位号0-3 → uid 1-4
+    await agoraClient.join(AGORA_APP_ID, channel, token || null, uid);
     console.log('[语音] ✓ 已加入频道: ' + channel);
     if (micEnabled.value && agoraLocalTrack) {
       await agoraClient.publish([agoraLocalTrack]);
