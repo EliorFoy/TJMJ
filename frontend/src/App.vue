@@ -2215,7 +2215,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .btn-ready:active { transform: scale(0.95); }
 
 /* 模式选择 + 联机大厅 */
-.mode-select-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: flex; justify-content: center; align-items: center; z-index: 999; }
+.mode-select-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(10,60,30,0.92); display: flex; justify-content: center; align-items: center; z-index: 999; }
 .mode-dialog { text-align: center; color: white; position: relative; overflow: hidden; transform: scale(1.1); margin-top: 2%; }
 .mode-dialog h2 { font-size: 36px; margin-bottom: 18px; color: #4CAF50; font-family: 'Microsoft YaHei', '微软雅黑', sans-serif; font-weight: bold; }
 .mode-btn { display: block; width: 260px; margin: 8px auto; padding: 14px; font-size: 18px; font-weight: bold; border: 2px solid #555; border-radius: 16px; cursor: pointer; background: rgba(255,255,255,0.1); color: white; transition: 0.2s; }
