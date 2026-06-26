@@ -1040,41 +1040,48 @@ const initAgoraClient = () => {
   });
 };
 
-// 向服务端请求Agora Token
+// 向服务端请求Agora Token（无Token时直接用App ID模式）
 const fetchAgoraToken = (roomId) => {
   return new Promise((resolve) => {
     const handler = (msg) => {
       if (msg.type === 'agora_token') {
         off('agora_token', handler);
+        console.log('[语音] 收到Token: ' + (msg.token ? '有(' + msg.token.substring(0,20) + '...)' : '无(使用App ID模式)'));
         resolve(msg.token || null);
       }
     };
     on('agora_token', handler);
     send({ type: 'get_agora_token', channel: 'tjmj_' + roomId });
-    setTimeout(() => { off('agora_token', handler); resolve(null); }, 3000);
+    setTimeout(() => { off('agora_token', handler); console.log('[语音] Token请求超时，使用无Token模式'); resolve(null); }, 5000);
   });
 };
 
 const joinAgoraChannel = async (roomId) => {
-  if (!AGORA_APP_ID || AGORA_APP_ID.includes('请替换')) {
-    console.log('[语音] 未配置Agora APP_ID，跳过');
+  if (!roomId) {
+    console.log('[语音] roomId为空，延迟重试...');
+    setTimeout(() => joinAgoraChannel(netState.roomId), 1000);
     return;
   }
   try {
     initAgoraClient();
     const token = await fetchAgoraToken(roomId);
     const channel = 'tjmj_' + roomId;
+    console.log('[语音] 正在加入频道: ' + channel + ' appId=' + AGORA_APP_ID.substring(0,8) + '... token=' + (token ? '有('+token.substring(0,20)+'...)' : '无'));
     await agoraClient.join(AGORA_APP_ID, channel, token || null, null);
-    console.log('[语音] 已加入频道: ' + channel + ' (token=' + (token ? '有' : '无') + ')');
+    console.log('[语音] ✓ 已加入频道: ' + channel);
     if (micEnabled.value && agoraLocalTrack) {
       await agoraClient.publish([agoraLocalTrack]);
-      console.log('[语音] 本地音轨已发布');
+      console.log('[语音] ✓ 本地音轨已发布');
     }
   } catch(e) {
-    console.error('[语音] 加入频道失败:', e.message, e.code);
-    // Token错误时提示
-    if (e.code === 'INVALID_TOKEN') {
-      alert('语音Token无效，请检查Agora项目配置');
+    console.error('[语音] ✗ 加入频道失败: code=' + e.code + ' msg=' + e.message);
+    if (e.code === 'INVALID_TOKEN' || e.message?.includes('token')) {
+      alert('语音Token无效！请确认start-all.bat中AGORA_APP_CERT已设置并重启服务器');
+    } else if (e.code === 'INVALID_APP_ID') {
+      alert('Agora App ID无效！');
+    } else {
+      console.log('[语音] 其他错误，3秒后重试...');
+      setTimeout(() => joinAgoraChannel(roomId), 3000);
     }
   }
 };
