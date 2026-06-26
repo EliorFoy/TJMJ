@@ -1040,6 +1040,21 @@ const initAgoraClient = () => {
   });
 };
 
+// 向服务端请求Agora Token
+const fetchAgoraToken = (roomId) => {
+  return new Promise((resolve) => {
+    const handler = (msg) => {
+      if (msg.type === 'agora_token') {
+        off('agora_token', handler);
+        resolve(msg.token || null);
+      }
+    };
+    on('agora_token', handler);
+    send({ type: 'get_agora_token', channel: 'tjmj_' + roomId });
+    setTimeout(() => { off('agora_token', handler); resolve(null); }, 3000);
+  });
+};
+
 const joinAgoraChannel = async (roomId) => {
   if (!AGORA_APP_ID || AGORA_APP_ID.includes('请替换')) {
     console.log('[语音] 未配置Agora APP_ID，跳过');
@@ -1047,15 +1062,20 @@ const joinAgoraChannel = async (roomId) => {
   }
   try {
     initAgoraClient();
-    await agoraClient.join(AGORA_APP_ID, 'tjmj_' + roomId, null, null);
-    console.log('[语音] 已加入Agora频道: tjmj_' + roomId);
-    // 如果已开麦，立即发布本地音轨
+    const token = await fetchAgoraToken(roomId);
+    const channel = 'tjmj_' + roomId;
+    await agoraClient.join(AGORA_APP_ID, channel, token || null, null);
+    console.log('[语音] 已加入频道: ' + channel + ' (token=' + (token ? '有' : '无') + ')');
     if (micEnabled.value && agoraLocalTrack) {
       await agoraClient.publish([agoraLocalTrack]);
       console.log('[语音] 本地音轨已发布');
     }
   } catch(e) {
-    console.log('[语音] 加入Agora频道失败:', e.message);
+    console.error('[语音] 加入频道失败:', e.message, e.code);
+    // Token错误时提示
+    if (e.code === 'INVALID_TOKEN') {
+      alert('语音Token无效，请检查Agora项目配置');
+    }
   }
 };
 
