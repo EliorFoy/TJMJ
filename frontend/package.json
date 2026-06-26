@@ -10,6 +10,7 @@
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
+    "agora-rtc-sdk-ng": "^4.24.5",
     "vue": "^3.5.30"
   },
   "devDependencies": {

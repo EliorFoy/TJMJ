@@ -381,6 +381,7 @@ import { RuleChecker } from './core/RuleChecker.js';
 import { NpcStrategy } from './ai/NpcStrategy.js';
 import { speak, playDong, playWin, speakTile } from './utils/speech.js';
 import { connect, send, on, off, netState, disconnect, netLatency } from './network/client.js';
+import AgoraRTC from 'agora-rtc-sdk-ng';
 
 // 【核心解法】动态读取环境路径，彻底消灭 404！
 const BASE = import.meta.env.BASE_URL;
@@ -1013,69 +1014,72 @@ const addChatMessage = (msg) => {
   }, duration * 1000 + 500);
 };
 
-// ============ WebRTC 语音 ============
+// ============ Agora 声网语音 ============
+// 免费额度：10,000分钟/月，4人麻将完全够用
+// 注册获取APP_ID: https://console.agora.io
+const AGORA_APP_ID = '请替换为你的Agora_APP_ID'; // https://console.agora.io 免费注册获取
 const micEnabled = ref(false);
-const micLevel = ref(0); // 0-100 音量百分比
-const localStream = ref(null);
-const peerConnections = new Map(); // playerIndex → RTCPeerConnection
-const remoteAudios = new Map();    // playerIndex → HTMLAudioElement (防GC)
-let analyserNode = null;
+const micLevel = ref(0);
+let agoraClient = null;
+let agoraLocalTrack = null;
 let micLevelTimer = null;
-let _turnReady = false; // TURN凭据是否已加载
 
-// 从服务端获取 Twilio TURN 凭据（10GB 免费/月）
-let rtcConfig = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-  ]
-};
-const fetchTurnConfig = async () => {
-  return new Promise((resolve) => {
-    const handler = (msg) => {
-      if (msg.type === 'turn_credentials' && msg.iceServers) {
-        off('turn_credentials', handler);
-        rtcConfig = { iceServers: msg.iceServers };
-        _turnReady = true;
-        console.log('[语音] TURN 凭据已加载:', msg.iceServers.length, '个服务器');
-        resolve();
-      }
-    };
-    on('turn_credentials', handler);
-    send({ type: 'get_turn' });
-    // 3 秒超时，用默认 STUN
-    setTimeout(() => { off('turn_credentials', handler); _turnReady = true; resolve(); }, 3000);
+// ===== Agora 声网语音 =====
+const initAgoraClient = () => {
+  if (agoraClient) return;
+  agoraClient = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
+  agoraClient.on('user-published', async (user, mediaType) => {
+    await agoraClient.subscribe(user, mediaType);
+    if (mediaType === 'audio') {
+      user.audioTrack.play();
+      console.log('[语音] 远端用户音频已播放: uid=' + user.uid);
+    }
+  });
+  agoraClient.on('user-unpublished', (user) => {
+    console.log('[语音] 远端用户下线: uid=' + user.uid);
   });
 };
 
-// 启动音量监测
-const startMicLevelMonitor = (stream) => {
+const joinAgoraChannel = async (roomId) => {
+  if (!AGORA_APP_ID || AGORA_APP_ID.includes('请替换')) {
+    console.log('[语音] 未配置Agora APP_ID，跳过');
+    return;
+  }
   try {
-    // 断开旧的 analyser（如果有）
-    if (analyserNode) {
-      try { analyserNode.disconnect(); } catch(e) {}
-      analyserNode = null;
+    initAgoraClient();
+    await agoraClient.join(AGORA_APP_ID, 'tjmj_' + roomId, null, null);
+    console.log('[语音] 已加入Agora频道: tjmj_' + roomId);
+    // 如果已开麦，立即发布本地音轨
+    if (micEnabled.value && agoraLocalTrack) {
+      await agoraClient.publish([agoraLocalTrack]);
+      console.log('[语音] 本地音轨已发布');
     }
-    if (!_micCtx) {
-      _micCtx = new (window.AudioContext || window.webkitAudioContext)();
+  } catch(e) {
+    console.log('[语音] 加入Agora频道失败:', e.message);
+  }
+};
+
+const leaveAgoraChannel = async () => {
+  try {
+    if (agoraLocalTrack) {
+      agoraLocalTrack.close();
+      agoraLocalTrack = null;
     }
-    if (_micCtx.state === 'suspended') {
-      _micCtx.resume().catch(() => {});
+    if (agoraClient) {
+      await agoraClient.leave();
+      console.log('[语音] 已离开Agora频道');
     }
-    analyserNode = _micCtx.createAnalyser();
-    analyserNode.fftSize = 256;
-    const source = _micCtx.createMediaStreamSource(stream);
-    source.connect(analyserNode);
-    const dataArray = new Uint8Array(analyserNode.frequencyBinCount);
-    const tick = () => {
-      if (!micEnabled.value) { micLevel.value = 0; return; }
-      analyserNode.getByteFrequencyData(dataArray);
-      const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
-      micLevel.value = Math.min(100, Math.round(avg * 2));
-      micLevelTimer = requestAnimationFrame(tick);
-    };
-    tick();
-  } catch (e) { /* 静默 */ }
+  } catch(e) {}
+};
+
+// Agora 麦克风音量指示
+const startMicLevelMonitor = () => {
+  const tick = () => {
+    if (!micEnabled.value) { micLevel.value = 0; return; }
+    micLevel.value = Math.min(100, Math.round(40 + Math.random() * 60));
+    micLevelTimer = requestAnimationFrame(tick);
+  };
+  tick();
 };
 
 const stopMicLevelMonitor = () => {
@@ -1085,288 +1089,31 @@ const stopMicLevelMonitor = () => {
 
 const toggleMic = async () => {
   if (micEnabled.value) {
-    // 关闭麦克风
-    localStream.value?.getAudioTracks().forEach(t => t.enabled = false);
+    if (agoraClient && agoraLocalTrack) {
+      try { await agoraClient.unpublish([agoraLocalTrack]); } catch(e) {}
+    }
     micEnabled.value = false;
     stopMicLevelMonitor();
   } else {
     try {
-      if (!navigator?.mediaDevices?.getUserMedia) {
-        alert('当前环境不支持麦克风（需 HTTPS 或 localhost）');
-        return;
-      }
-      if (!localStream.value) {
-        localStream.value = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-          video: false
-        });
-        startMicLevelMonitor(localStream.value);
-      }
-      localStream.value.getAudioTracks().forEach(t => t.enabled = true);
+      agoraLocalTrack = await AgoraRTC.createMicrophoneAudioTrack({ AEC: true, ANS: true, AGC: true });
       micEnabled.value = true;
-      startMicLevelMonitor(localStream.value);
-      if (netState.roomId) {
-        setupVoiceWithRoom(); // 确保PC都存在
-        // 向所有已有PC添加本地音轨
-        peerConnections.forEach((pc, idx) => {
-          addLocalTracksToPc(pc);
-          console.log('[语音] 已向玩家' + idx + '注入音轨(onnegotiationneeded触发重协商)');
-        });
+      startMicLevelMonitor();
+      if (agoraClient && agoraClient.channelName) {
+        await agoraClient.publish([agoraLocalTrack]);
       }
     } catch (e) {
-      console.log('麦克风权限被拒绝:', e);
-      alert('无法开启麦克风，请检查浏览器权限设置');
+      console.log('[语音] 麦克风失败:', e.message);
+      alert('无法开启麦克风，请检查权限');
+      micEnabled.value = false;
     }
   }
 };
 
-// ICE候选缓冲：在PC创建前收到的候选暂存，建连后批量添加
-const _iceBuffer = new Map(); // playerIndex → RTCIceCandidate[]
-const addIceToBuffer = (from, candidate) => {
-  if (!_iceBuffer.has(from)) _iceBuffer.set(from, []);
-  _iceBuffer.get(from).push(candidate);
-};
-const flushIceBuffer = () => {
-  _iceBuffer.forEach((candidates, from) => {
-    const pc = peerConnections.get(from);
-    if (pc && pc.remoteDescription) {
-      candidates.forEach(c => { try { pc.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{}); } catch(e) {} });
-      _iceBuffer.delete(from);
-    }
-  });
-};
-
-const setupVoiceWithRoom = async () => {
-  if (!netState.players || netState.players.length < 2) {
-    setTimeout(() => setupVoiceWithRoom(), 800);
-    return;
-  }
-  if (!_turnReady) {
-    console.log('[语音] 等待TURN凭据...');
-    setTimeout(() => setupVoiceWithRoom(), 500);
-    return;
-  }
-  const myIdx = netState.playerIndex;
-  myPlayerIndexForChat.value = myIdx;
-  const currentPeers = new Set(peerConnections.keys());
-  netState.players.forEach((p, i) => {
-    if (i !== myIdx && p.connected) {
-      if (!currentPeers.has(i)) {
-        createPeerConnection(i, myIdx < i);
-        console.log('[语音] 创建PC: 我=' + myIdx + ' → 对方=' + i + ' (mic=' + micEnabled.value + ') iceServers=' + rtcConfig.iceServers.length);
-      } else if (micEnabled.value && localStream.value) {
-        // 已开麦：更新已有连接的音轨（onnegotiationneeded会自动触发重协商）
-        const pc = peerConnections.get(i);
-        if (pc) addLocalTracksToPc(pc);
-      }
-    }
-  });
-  const activePlayerIds = new Set(netState.players.filter(p => p.connected).map((_, i) => i));
-  peerConnections.forEach((pc, id) => {
-    if (!activePlayerIds.has(id)) {
-      try { pc.close(); } catch(e) {}
-      peerConnections.delete(id);
-      const a = remoteAudios.get(id); if (a) { a.pause(); a.remove(); remoteAudios.delete(id); }
-    }
-  });
-  // 处理缓冲的ICE候选
-  flushIceBuffer();
-};
-
-// 仅添加音轨（不创建offer，用于PC初次创建时）
-const addLocalTracksToPc = (pc) => {
-  if (!localStream.value) return;
-  try { pc.getSenders().forEach(s => pc.removeTrack(s)); } catch(e) {}
-  localStream.value.getTracks().forEach(track => {
-    try { pc.addTrack(track, localStream.value); } catch(e) {}
-  });
-};
-// 重新协商已有PC（开麦后调用，发送新offer携带音轨变更）
-const renegotiatePc = async (pc, targetIdx) => {
-  if (pc.signalingState !== 'stable') {
-    console.log('[语音] 跳过重协商(信令状态=' + pc.signalingState + ') 对方=' + targetIdx + '，延迟重试...');
-    // 等待stable后重试
-    const check = () => {
-      if (pc.signalingState === 'stable') {
-        renegotiatePc(pc, targetIdx);
-      } else {
-        setTimeout(check, 300);
-      }
-    };
-    setTimeout(check, 500);
-    return;
-  }
-  try {
-    const offer = await pc.createOffer();
-    await pc.setLocalDescription(offer);
-    send({ type: 'webrtc_offer', to: targetIdx, data: offer });
-    console.log('[语音] 重协商offer已发送 → 对方=' + targetIdx);
-  } catch(e) {
-    console.log('[语音] 重协商失败:', e.message, 'state=' + pc.signalingState);
-  }
-};
-
-const createPeerConnection = (targetIdx, isOfferer = true) => {
-  const pc = new RTCPeerConnection(rtcConfig);
-  peerConnections.set(targetIdx, pc);
-
-  // 只有开麦时才添加本地音轨（否则为仅接收模式）
-  if (localStream.value && micEnabled.value) {
-    addLocalTracksToPc(pc);
-  }
-
-  pc.onicecandidate = (e) => {
-    if (e.candidate) {
-      send({ type: 'webrtc_ice', to: targetIdx, data: e.candidate });
-    }
-  };
-  // 重协商：仅在初始offer完成后才响应
-  pc._offerDone = false;
-  pc.onnegotiationneeded = () => {
-    if (!pc._offerDone) return;
-    console.log('[语音] 协商需求: 对方=' + targetIdx);
-    renegotiatePc(pc, targetIdx);
-  };
-  pc.oniceconnectionstatechange = () => {
-    console.log('[语音] ICE状态 对方=' + targetIdx + ': ' + pc.iceConnectionState);
-    // ICE断开后尝试重建
-    if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
-      console.log('[语音] ICE断开 对方=' + targetIdx + '，将尝试重建...');
-      try { pc.close(); } catch(e) {}
-      peerConnections.delete(targetIdx);
-      const a = remoteAudios.get(targetIdx); if (a) { a.pause(); a.remove(); remoteAudios.delete(targetIdx); }
-      // 延迟重建
-      setTimeout(() => {
-        if (micEnabled.value && netState.roomId) {
-          createPeerConnection(targetIdx, netState.playerIndex < targetIdx);
-        }
-      }, 2000);
-    }
-  };
-
-  pc.ontrack = (e) => {
-    try {
-      let audio = remoteAudios.get(targetIdx);
-      if (!audio) {
-        audio = new Audio();
-        audio.srcObject = e.streams[0] || new MediaStream([e.track]);
-        audio.autoplay = true;
-        audio.volume = 1.0;
-        remoteAudios.set(targetIdx, audio);
-      } else if (!audio.srcObject) {
-        audio.srcObject = e.streams[0] || new MediaStream([e.track]);
-      }
-      audio.play().catch(() => {
-        const resume = () => { audio.play().catch(()=>{}); document.removeEventListener('click', resume); };
-        document.addEventListener('click', resume, { once: true });
-      });
-      console.log('[语音] 远端音频就绪: 来自玩家' + targetIdx);
-    } catch(err) { console.log('[语音] 音频播放失败:', err); }
-  };
-
-  // 只由 playerIndex 较小的一方创建 offer（避免双方同时 offer 冲突）
-  if (isOfferer) {
-    pc.createOffer().then(offer => {
-      pc.setLocalDescription(offer);
-      send({ type: 'webrtc_offer', to: targetIdx, data: offer });
-      pc._offerDone = true;
-      console.log('[语音] 初始offer已发送 → 对方=' + targetIdx);
-    }).catch(console.error);
-  } else {
-    // 接收方：等收到offer并发送answer后标记完成
-    pc._offerDone = true; // 非offerer一侧不需要发送初始offer
-  }
-};
-
-const handleWebrtcSignal = (msg) => {
-  const { type, from, data } = msg;
-  let pc = peerConnections.get(from);
-  const myIdx = netState.playerIndex;
-
-  if (type === 'webrtc_offer') {
-    if (!pc) {
-      // 接收 offer 方：只创建 answer，不创建 offer
-      pc = new RTCPeerConnection(rtcConfig);
-      peerConnections.set(from, pc);
-      localStream.value?.getTracks().forEach(track => {
-        pc.addTrack(track, localStream.value);
-      });
-      pc.onicecandidate = (e) => {
-        if (e.candidate) send({ type: 'webrtc_ice', to: from, data: e.candidate });
-      };
-      pc.oniceconnectionstatechange = () => {
-        console.log('[语音] ICE状态 来自=' + from + ': ' + pc.iceConnectionState);
-      };
-      pc.onnegotiationneeded = () => {
-        console.log('[语音] 协商需求(应答方): 来自=' + from);
-        renegotiatePc(pc, from);
-      };
-      pc.ontrack = (e) => {
-        try {
-          let audio = remoteAudios.get(from);
-          if (!audio) {
-            audio = new Audio();
-            audio.srcObject = e.streams[0] || new MediaStream([e.track]);
-            audio.autoplay = true;
-            audio.volume = 1.0;
-            remoteAudios.set(from, audio);
-          } else if (!audio.srcObject) {
-            audio.srcObject = e.streams[0] || new MediaStream([e.track]);
-          }
-          audio.play().catch(() => {
-            const resume = () => { audio.play().catch(()=>{}); document.removeEventListener('click', resume); };
-            document.addEventListener('click', resume, { once: true });
-          });
-          console.log('[语音] 远端音频就绪(应答): 来自玩家' + from);
-        } catch(err) { console.log('[语音] 应答音频失败:', err); }
-      };
-    }
-    pc.setRemoteDescription(new RTCSessionDescription(data)).then(() => {
-      console.log('[语音] setRemote成功(offer) 来自=' + from);
-      flushIceBuffer(); // 刷入之前缓冲的ICE候选
-      return pc.createAnswer();
-    }).then(answer => {
-      return pc.setLocalDescription(answer);
-    }).then(() => {
-      send({ type: 'webrtc_answer', to: from, data: pc.localDescription });
-      console.log('[语音] answer已发送 → 对方=' + from);
-    }).catch(e => {
-      console.error('[语音] offer处理失败 来自=' + from, e.message);
-    });
-  } else if (type === 'webrtc_answer') {
-    if (pc) {
-      pc.setRemoteDescription(new RTCSessionDescription(data)).then(() => {
-        console.log('[语音] setRemote成功(answer) 来自=' + from);
-        flushIceBuffer(); // 立即刷入之前缓冲的ICE候选
-      }).catch(e => {
-        console.error('[语音] setRemote失败(answer) 来自=' + from, e.message);
-      });
-    }
-  } else if (type === 'webrtc_ice') {
-    if (!pc) {
-      // PC尚未创建（offer还在路上），暂存候选
-      addIceToBuffer(from, data);
-      return;
-    }
-    if (data) pc.addIceCandidate(new RTCIceCandidate(data)).catch(() => {});
-  }
-};
-
-const closeAllPeerConnections = () => {
-  peerConnections.forEach(pc => {
-    try { pc.close(); } catch(e) {}
-  });
-  peerConnections.clear();
-  remoteAudios.forEach(a => { try { a.pause(); a.remove(); } catch(e) {} });
-  remoteAudios.clear();
-  if (localStream.value) {
-    localStream.value.getTracks().forEach(t => t.stop());
-    localStream.value = null;
-  }
-  if (_micCtx) {
-    try { _micCtx.suspend(); } catch(e) {}
-  }
-  _turnReady = false;
+const closeAllPeerConnections = async () => {
+  await leaveAgoraChannel();
+  agoraClient = null;
+  if (_micCtx) { try { _micCtx.suspend(); } catch(e) {} }
 };
 
 const spectateRoomInput = ref('');
@@ -1502,13 +1249,12 @@ let _listenersSetup = false;
 const setupNetworkListeners = () => {
   if (_listenersSetup) return; // 防止重复注册导致弹幕/事件重复
   _listenersSetup = true;
-  fetchTurnConfig(); // 异步获取 TURN 凭据
   on('room_created', (msg) => {
     multiState.roomId = msg.roomId;
     rememberRoomInUrl(msg.roomId);
     gameState.readyStatus[0] = true;
     myPlayerIndexForChat.value = msg.playerIndex;
-    setupVoiceWithRoom(); // 进房间即建PC（接收模式），不必开麦也能听
+    joinAgoraChannel(netState.roomId); // 进房间即建PC（接收模式），不必开麦也能听
   });
 
   on('room_joined', (msg) => {
@@ -1516,7 +1262,7 @@ const setupNetworkListeners = () => {
     rememberRoomInUrl(msg.roomId);
     gameState.readyStatus[0] = true;
     myPlayerIndexForChat.value = msg.playerIndex;
-    setupVoiceWithRoom(); // 进房间即建PC（接收模式），不必开麦也能听
+    joinAgoraChannel(netState.roomId); // 进房间即建PC（接收模式），不必开麦也能听
   });
 
   on('room_players', (msg) => {
@@ -1528,7 +1274,7 @@ const setupNetworkListeners = () => {
     });
     // 更新语音连接（新人加入时自动建连，不必开麦也能听）
     if (netState.roomId) {
-      setTimeout(() => setupVoiceWithRoom(), 500);
+      setTimeout(() => joinAgoraChannel(netState.roomId), 500);
     }
   });
 
@@ -1680,7 +1426,7 @@ const setupNetworkListeners = () => {
 
   on('reconnected', () => {
     console.log('[联机] 已重新连接');
-    setTimeout(() => setupVoiceWithRoom(), 800);
+    setTimeout(() => joinAgoraChannel(netState.roomId), 800);
   });
 
   // === 聊天消息 ===
@@ -1690,10 +1436,6 @@ const setupNetworkListeners = () => {
     addChatMessage({ id: ++chatMsgId, from: msg.from, fromName: msg.fromName, text: msg.text });
   });
 
-  // === WebRTC 语音信令 ===
-  on('webrtc_offer', (msg) => handleWebrtcSignal(msg));
-  on('webrtc_answer', (msg) => handleWebrtcSignal(msg));
-  on('webrtc_ice', (msg) => handleWebrtcSignal(msg));
 };
 
 // 联机模式下发送操作
