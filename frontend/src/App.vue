@@ -63,7 +63,7 @@
             <button class="mode-btn" @click="enterGame('spectate')">观战模式</button>
             <button class="mode-btn test-mode-btn" @click="enterGame('test')" disabled title="其他玩法暂未开放">其他玩法</button>
             <div class="info-links">
-              <a class="info-link" :href="`${BASE}docs/TJMJ_CN.pdf`" target="_blank">教程文档</a>
+              <a class="info-link" :href="`${BASE}docs/TJMJ_CN.pdf`" target="_blank">技术文档</a>
               <a class="info-link" @click="openInfo('video')">演示视频</a>
               <a class="info-link" @click="openInfo('disclaimer')">使用协议</a>
             </div>
@@ -329,7 +329,7 @@
         <button class="info-close" @click="closeInfo">✕</button>
         <div v-if="infoOverlay === 'manual'" class="info-text" style="text-align:center;display:flex;align-items:center;justify-content:center;flex-direction:column;">
           <p style="font-size:16px;color:#ddd;">点击下方按钮在新标签页中查看高清文档</p>
-          <a :href="`${BASE}docs/TJMJ_CN.pdf`" target="_blank" class="info-link" style="font-size:18px;color:#ffd700;margin-top:16px;">📄 打开教程文档</a>
+          <a :href="`${BASE}docs/TJMJ_CN.pdf`" target="_blank" class="info-link" style="font-size:18px;color:#ffd700;margin-top:16px;">📄 打开技术文档</a>
         </div>
         <div v-if="infoOverlay === 'video'" class="info-video-wrap">
           <video :src="`${BASE}docs/showcase.mp4`" controls class="info-video" controlsList="nodownload nofullscreen" disableRemotePlayback crossorigin="anonymous" playsinline></video>
@@ -585,7 +585,7 @@ watch(() => [...gameState.handTiles], (after, before) => {
 
 // 昵称记忆 & 随机
 const showMemory = ref(false);
-const memoryNames = ['cjj','zzw','xjh','xjt','lsy','syy','hj','hlh','cyh','lem','cjl','mjl'];
+const memoryNames = ['cjj','zzw','xjh','xjt','lsy','syy','hj','cyh','lem','cjl','mjl','wjq','wjh','hlh','wt','xsm'];
 const randomNames = ['祖国人','内向小男孩','乡里人','城里人','花开富贵','奥特曼','如来佛','机器人','最强NPC','AI','路障僵尸','阿强','阿珍','阿贵','超鬼','奥利给','球草','球花'];
 let lastRollIdx = -1;
 const rollNickname = () => {
@@ -1274,7 +1274,10 @@ const leaveRoom = () => {
   history.replaceState(null, '', url.toString());
 };
 
+let _listenersSetup = false;
 const setupNetworkListeners = () => {
+  if (_listenersSetup) return; // 防止重复注册导致弹幕/事件重复
+  _listenersSetup = true;
   fetchTurnConfig(); // 异步获取 TURN 凭据
   on('room_created', (msg) => {
     multiState.roomId = msg.roomId;
@@ -1458,6 +1461,8 @@ const setupNetworkListeners = () => {
 
   // === 聊天消息 ===
   on('chat', (msg) => {
+    // 跳过自己发的消息（sendChat 中已本地添加，避免弹幕重复）
+    if (msg.from === myPlayerIndexForChat.value) return;
     addChatMessage({ id: ++chatMsgId, from: msg.from, fromName: msg.fromName, text: msg.text });
   });
 
@@ -2374,7 +2379,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .showdown-name.winner-name { color: #ffd700; font-weight: bold; text-shadow: 0 0 6px rgba(255,215,0,0.5); }
 
 /* 删掉原来的结算相关样式 */
-.showdown-tile-bg { position: absolute; width: 100%; height: 100%; z-index: 0; }
+.showdown-tile-bg { position: absolute; width: 100%; height: 100%; z-index: 0; transform: translateX(-15px); }
 .showdown-tile-face { position: absolute; top: 1px; left: 85%; transform: translate(-35%); width: 19px; height: 26px; z-index: 2; }
 .showdown-score { font-size: 14px; font-weight: bold; min-width: 45px; text-align: right; }
 .showdown-round { font-size: 13px; margin: 8px 0; color: #aaa; }
