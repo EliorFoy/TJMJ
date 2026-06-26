@@ -135,7 +135,7 @@ Web-based & $\times$ & $\surd$ & $\surd$ & $\surd$ \\
 
 \subsection{Web Technologies for Real-Time Gaming}
 
-Modern browser APIs have enabled sophisticated real-time multiplayer experiences without native installation. The WebSocket protocol (RFC~6455) provides full-duplex communication with minimal overhead, while Agora enables peer-to-peer audio/video streaming with NAT traversal via Agora/TURN infrastructure. The Vue~3 Composition API, combined with Vite's module bundling, offers reactive state management suitable for complex game UIs. These technologies collectively form the foundation of TJMJ's architecture.
+Modern browser APIs have enabled sophisticated real-time multiplayer experiences without native installation. The WebSocket protocol (RFC~6455) provides full-duplex communication with minimal overhead, while Agora SD-RTN provides cloud-based real-time voice with automatic NAT traversal. The Vue~3 Composition API, combined with Vite's module bundling, offers reactive state management suitable for complex game UIs. These technologies collectively form the foundation of TJMJ's architecture.
 
 % ===================================================================
 \section{System Architecture}
@@ -160,7 +160,7 @@ TJMJ adopts a three-tier architecture comprising a Vue~3 SPA presentation layer,
   % Layer 2: Network
   \node[cloud,below=of clients,minimum width=10cm,text width=9.5cm] (network) {
     \textbf{Network Layer}\\[2pt]
-    ngrok TCP Tunnel (wss://) \quad Agora/TURN \quad Agora Agora Cloud
+    ngrok TCP Tunnel (wss://) \quad Agora/TURN \quad Agora SD-RTN Cloud
   };
 
   % Layer 3: Server
@@ -264,7 +264,7 @@ The server is a lightweight Node.js application (494 lines in \texttt{GameRoom.j
     \end{tabular}
   };
 
-  \node[smallblock,right=of room,xshift=2cm,fill=cyan!8] (turn) {\textbf{TURN Generator}\\Agora HMAC-SHA1\\TTL = 86400s};
+  \node[smallblock,right=of room,xshift=2cm,fill=cyan!8] (turn) {\textbf{Agora Token Generator}\\Agora HMAC-SHA1\\TTL = 86400s};
 
   \draw[arrow] (wss) -- (router);
   \draw[arrow] (router) -- (room);
@@ -318,7 +318,7 @@ TJMJ employs a layered communication architecture. The WebSocket layer provides 
 
 \subsection{Agora Voice Mesh Topology}
 
-The voice subsystem employs a full-mesh P2P topology where each of the $N=4$ players maintains $N-1=3$ bidirectional RTCcloud connections. Signaling (SDP exchange and Token relay) is multiplexed over the existing WebSocket connection. NAT traversal is facilitated by Google Agora servers (primary) and Agora SD-RTN relays (fallback for symmetric NAT/cellular networks).
+The voice subsystem employs Agora SD-RTN cloud relay architecture -- all players join the same Agora channel (tjmj_roomId). Each player publishes one local audio track captured via 	exttt{createMicrophoneAudioTrack} with AEC/ANS/AGC; the Agora cloud automatically distributes audio to all other channel members. Tokens are generated server-side using HMAC-SHA1 with 24-hour validity. This architecture eliminates all P2P connection management complexity and NAT traversal issues. Free tier: 10,000 minutes/month.
 
 \begin{figure}[H]
 \centering
