@@ -1110,7 +1110,7 @@ const toggleMic = async () => {
         // 向所有已有PC添加本地音轨
         peerConnections.forEach((pc, idx) => {
           addLocalTracksToPc(pc);
-          console.log('[语音] 已向玩家' + idx + '添加音轨');
+          console.log('[语音] 已向玩家' + idx + '注入音轨(onnegotiationneeded触发重协商)');
         });
       }
     } catch (e) {
@@ -1155,7 +1155,7 @@ const setupVoiceWithRoom = async () => {
         createPeerConnection(i, myIdx < i);
         console.log('[语音] 创建PC: 我=' + myIdx + ' → 对方=' + i + ' (mic=' + micEnabled.value + ') iceServers=' + rtcConfig.iceServers.length);
       } else if (micEnabled.value && localStream.value) {
-        // 已开麦：更新已有连接的音轨
+        // 已开麦：更新已有连接的音轨（onnegotiationneeded会自动触发重协商）
         const pc = peerConnections.get(i);
         if (pc) addLocalTracksToPc(pc);
       }
@@ -1173,14 +1173,24 @@ const setupVoiceWithRoom = async () => {
   flushIceBuffer();
 };
 
+// 仅添加音轨（不创建offer，用于PC初次创建时）
 const addLocalTracksToPc = (pc) => {
   if (!localStream.value) return;
-  try {
-    pc.getSenders().forEach(s => pc.removeTrack(s));
-  } catch(e) {}
+  try { pc.getSenders().forEach(s => pc.removeTrack(s)); } catch(e) {}
   localStream.value.getTracks().forEach(track => {
     try { pc.addTrack(track, localStream.value); } catch(e) {}
   });
+};
+// 重新协商已有PC（开麦/关麦后调用，发送新offer携带音轨变更）
+const renegotiatePc = async (pc, targetIdx) => {
+  try {
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    send({ type: 'webrtc_offer', to: targetIdx, data: offer });
+    console.log('[语音] 重协商offer已发送 → 对方=' + targetIdx);
+  } catch(e) {
+    console.log('[语音] 重协商失败:', e.message);
+  }
 };
 
 const createPeerConnection = (targetIdx, isOfferer = true) => {
@@ -1197,9 +1207,10 @@ const createPeerConnection = (targetIdx, isOfferer = true) => {
       send({ type: 'webrtc_ice', to: targetIdx, data: e.candidate });
     }
   };
-  // 监听协商需求（开麦时对已有连接重新协商）
+  // 重协商：开麦/关麦后addTrack触发，发送新offer
   pc.onnegotiationneeded = () => {
-    console.log('[语音] 协商需求: 对方=' + targetIdx);
+    console.log('[语音] 协商需求触发: 对方=' + targetIdx);
+    renegotiatePc(pc, targetIdx);
   };
   pc.oniceconnectionstatechange = () => {
     console.log('[语音] ICE状态 对方=' + targetIdx + ': ' + pc.iceConnectionState);
@@ -1265,6 +1276,10 @@ const handleWebrtcSignal = (msg) => {
       };
       pc.oniceconnectionstatechange = () => {
         console.log('[语音] ICE状态 来自=' + from + ': ' + pc.iceConnectionState);
+      };
+      pc.onnegotiationneeded = () => {
+        console.log('[语音] 协商需求(应答方): 来自=' + from);
+        renegotiatePc(pc, from);
       };
       pc.ontrack = (e) => {
         try {
