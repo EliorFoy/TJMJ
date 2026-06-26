@@ -1106,7 +1106,12 @@ const toggleMic = async () => {
       micEnabled.value = true;
       startMicLevelMonitor(localStream.value);
       if (netState.roomId) {
-        setupVoiceWithRoom();
+        setupVoiceWithRoom(); // 确保PC都存在
+        // 向所有已有PC添加本地音轨
+        peerConnections.forEach((pc, idx) => {
+          addLocalTracksToPc(pc);
+          console.log('[语音] 已向玩家' + idx + '添加音轨');
+        });
       }
     } catch (e) {
       console.log('麦克风权限被拒绝:', e);
@@ -1115,13 +1120,27 @@ const toggleMic = async () => {
   }
 };
 
+// ICE候选缓冲：在PC创建前收到的候选暂存，建连后批量添加
+const _iceBuffer = new Map(); // playerIndex → RTCIceCandidate[]
+const addIceToBuffer = (from, candidate) => {
+  if (!_iceBuffer.has(from)) _iceBuffer.set(from, []);
+  _iceBuffer.get(from).push(candidate);
+};
+const flushIceBuffer = () => {
+  _iceBuffer.forEach((candidates, from) => {
+    const pc = peerConnections.get(from);
+    if (pc && pc.remoteDescription) {
+      candidates.forEach(c => { try { pc.addIceCandidate(new RTCIceCandidate(c)).catch(()=>{}); } catch(e) {} });
+      _iceBuffer.delete(from);
+    }
+  });
+};
+
 const setupVoiceWithRoom = async () => {
-  if (!localStream.value) return;
   if (!netState.players || netState.players.length < 2) {
     setTimeout(() => setupVoiceWithRoom(), 800);
     return;
   }
-  // 等待 TURN 凭据就绪后再建连（否则移动4G/5G无法穿透NAT）
   if (!_turnReady) {
     console.log('[语音] 等待TURN凭据...');
     setTimeout(() => setupVoiceWithRoom(), 500);
@@ -1134,15 +1153,11 @@ const setupVoiceWithRoom = async () => {
     if (i !== myIdx && p.connected) {
       if (!currentPeers.has(i)) {
         createPeerConnection(i, myIdx < i);
-        console.log('[语音] 创建P2P连接: 我=' + myIdx + ' → 对方=' + i + ' iceServers=' + rtcConfig.iceServers.length);
-      } else {
+        console.log('[语音] 创建PC: 我=' + myIdx + ' → 对方=' + i + ' (mic=' + micEnabled.value + ') iceServers=' + rtcConfig.iceServers.length);
+      } else if (micEnabled.value && localStream.value) {
+        // 已开麦：更新已有连接的音轨
         const pc = peerConnections.get(i);
-        if (pc && localStream.value) {
-          pc.getSenders().forEach(s => pc.removeTrack(s));
-          localStream.value.getTracks().forEach(track => {
-            try { pc.addTrack(track, localStream.value); } catch(e) {}
-          });
-        }
+        if (pc) addLocalTracksToPc(pc);
       }
     }
   });
@@ -1152,8 +1167,19 @@ const setupVoiceWithRoom = async () => {
       try { pc.close(); } catch(e) {}
       peerConnections.delete(id);
       const a = remoteAudios.get(id); if (a) { a.pause(); a.remove(); remoteAudios.delete(id); }
-      console.log('[语音] 移除断线玩家:', id);
     }
+  });
+  // 处理缓冲的ICE候选
+  flushIceBuffer();
+};
+
+const addLocalTracksToPc = (pc) => {
+  if (!localStream.value) return;
+  try {
+    pc.getSenders().forEach(s => pc.removeTrack(s));
+  } catch(e) {}
+  localStream.value.getTracks().forEach(track => {
+    try { pc.addTrack(track, localStream.value); } catch(e) {}
   });
 };
 
@@ -1161,14 +1187,19 @@ const createPeerConnection = (targetIdx, isOfferer = true) => {
   const pc = new RTCPeerConnection(rtcConfig);
   peerConnections.set(targetIdx, pc);
 
-  localStream.value?.getTracks().forEach(track => {
-    pc.addTrack(track, localStream.value);
-  });
+  // 只有开麦时才添加本地音轨（否则为仅接收模式）
+  if (localStream.value && micEnabled.value) {
+    addLocalTracksToPc(pc);
+  }
 
   pc.onicecandidate = (e) => {
     if (e.candidate) {
       send({ type: 'webrtc_ice', to: targetIdx, data: e.candidate });
     }
+  };
+  // 监听协商需求（开麦时对已有连接重新协商）
+  pc.onnegotiationneeded = () => {
+    console.log('[语音] 协商需求: 对方=' + targetIdx);
   };
   pc.oniceconnectionstatechange = () => {
     console.log('[语音] ICE状态 对方=' + targetIdx + ': ' + pc.iceConnectionState);
@@ -1263,7 +1294,12 @@ const handleWebrtcSignal = (msg) => {
   } else if (type === 'webrtc_answer') {
     if (pc) pc.setRemoteDescription(new RTCSessionDescription(data)).catch(console.error);
   } else if (type === 'webrtc_ice') {
-    if (pc && data) pc.addIceCandidate(new RTCIceCandidate(data)).catch(console.error);
+    if (!pc) {
+      // PC尚未创建（offer还在路上），暂存候选
+      addIceToBuffer(from, data);
+      return;
+    }
+    if (data) pc.addIceCandidate(new RTCIceCandidate(data)).catch(() => {});
   }
 };
 
@@ -1423,7 +1459,7 @@ const setupNetworkListeners = () => {
     rememberRoomInUrl(msg.roomId);
     gameState.readyStatus[0] = true;
     myPlayerIndexForChat.value = msg.playerIndex;
-    if (micEnabled.value) setupVoiceWithRoom();
+    setupVoiceWithRoom(); // 进房间即建PC（接收模式），不必开麦也能听
   });
 
   on('room_joined', (msg) => {
@@ -1431,8 +1467,7 @@ const setupNetworkListeners = () => {
     rememberRoomInUrl(msg.roomId);
     gameState.readyStatus[0] = true;
     myPlayerIndexForChat.value = msg.playerIndex;
-    // 如果麦克风已开，建立语音连接
-    if (micEnabled.value) setupVoiceWithRoom();
+    setupVoiceWithRoom(); // 进房间即建PC（接收模式），不必开麦也能听
   });
 
   on('room_players', (msg) => {
@@ -1442,8 +1477,8 @@ const setupNetworkListeners = () => {
       gameState.players[i].avatar = p.avatar || gameState.players[i].avatar;
       gameState.players[i].score = p.score != null ? p.score : gameState.players[i].score;
     });
-    // 更新语音连接（新人加入时自动建连）
-    if (micEnabled.value && netState.roomId) {
+    // 更新语音连接（新人加入时自动建连，不必开麦也能听）
+    if (netState.roomId) {
       setTimeout(() => setupVoiceWithRoom(), 500);
     }
   });
@@ -1596,7 +1631,7 @@ const setupNetworkListeners = () => {
 
   on('reconnected', () => {
     console.log('[联机] 已重新连接');
-    if (micEnabled.value) setTimeout(() => setupVoiceWithRoom(), 800);
+    setTimeout(() => setupVoiceWithRoom(), 800);
   });
 
   // === 聊天消息 ===
