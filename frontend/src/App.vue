@@ -1075,7 +1075,8 @@ const joinAgoraChannel = async (roomId) => {
     const channel = 'tjmj_' + roomId;
     console.log('[语音] 正在加入频道: ' + channel + ' appId=' + AGORA_APP_ID.substring(0,8) + '... token=' + (token ? '有('+token.substring(0,20)+'...)' : '无'));
     const uid = netState.playerIndex + 1; // 座位号0-3 → uid 1-4
-    await agoraClient.join(AGORA_APP_ID, channel, token || null, uid);
+    // 临时：跳过Token，用App ID直连测试（若失败则证明项目强制要求Token）
+    await agoraClient.join(AGORA_APP_ID, channel, null, uid);
     console.log('[语音] ✓ 已加入频道: ' + channel);
     if (micEnabled.value && agoraLocalTrack) {
       await agoraClient.publish([agoraLocalTrack]);
