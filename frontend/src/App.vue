@@ -1507,6 +1507,7 @@ const setupNetworkListeners = () => {
   on('round_end', (msg) => {
     gameState.gamePhase = 'SETTLEMENT';
     gameState.showdownHands = msg.hands;
+    lastWinTile.value = msg.winTile || null;
     readyNextCount.value = 0;
     if (msg.scores) msg.scores.forEach((s, i) => { gameState.players[i].score = s; });
     if (msg.totalScores) gameState.players.forEach((p, i) => { p.score = msg.totalScores[i] || 0; });
@@ -2476,7 +2477,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .showdown-name.winner-name { color: #ffd700; font-weight: bold; text-shadow: 0 0 6px rgba(255,215,0,0.5); }
 
 /* 删掉原来的结算相关样式 */
-.showdown-tile-bg { position: absolute; width: 100%; height: 100%; z-index: 0; transform: translateX(-10px); }
+.showdown-tile-bg { position: absolute; width: 100%; height: 100%; z-index: 0; transform: translateX(-12px); }
 .showdown-tile-face { position: absolute; top: 1px; left: 85%; transform: translate(-35%); width: 19px; height: 26px; z-index: 2; }
 .showdown-score { font-size: 14px; font-weight: bold; min-width: 45px; text-align: right; }
 .showdown-round { font-size: 13px; margin: 8px 0; color: #aaa; }

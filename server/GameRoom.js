@@ -30,6 +30,7 @@ export class GameRoom {
     this.currentPlayerIndex = 0;
     this.lastDiscard = null;      // { tile, fromPlayer }
     this.pendingActions = null;   // { actions: {...}, deadline }
+    this.winTile = null;          // 胡的那张牌（用于亮牌展示）
     this.actionResponded = 0;
     this.actionResults = [];
   }
@@ -115,6 +116,7 @@ export class GameRoom {
     if (this.players.length < 4) return;
     this.state = 'PLAYING';
     this.pendingActions = null; // 清除上一局残留
+    this.winTile = null;
     this.hands = [[], [], [], []];
     this.discards = [];
     this.exposed = [[], [], [], []];
@@ -219,14 +221,21 @@ export class GameRoom {
   handleAction(playerIndex, actionType, combo = null) {
     try {
       console.log(`[服务器] handleAction: p${playerIndex} ${actionType} combo=${combo} pending=${!!this.pendingActions}`);
-      if (!this.pendingActions) return;
+      // 自摸胡牌不受 pendingActions 限制（玩家摸牌后可直接胡）
+      if (!this.pendingActions && actionType !== 'hu') return;
       const pa = this.pendingActions;
-      if (!pa.actions || !pa.actions[actionType]) { console.log('[服务器] 无效操作'); return; }
+      if (pa && (!pa.actions || !pa.actions[actionType])) {
+        if (actionType !== 'hu') { console.log('[服务器] 无效操作'); return; }
+      }
 
       pa.actionResponded++;
       pa.actionResults.push({ player: playerIndex, action: actionType, combo });
 
       if (actionType === 'hu') {
+        // 记录胡的那张牌：抓炮=lastDiscard.tile，自摸=手牌最后一张
+        this.winTile = (this.pendingActions && this.lastDiscard)
+          ? this.lastDiscard.tile
+          : this.hands[playerIndex][this.hands[playerIndex].length - 1];
         this.endRound(playerIndex);
         return;
       }
@@ -427,6 +436,7 @@ export class GameRoom {
       type: 'round_end',
       winnerIndex,
       hands: this.hands,
+      winTile: this.winTile || null,
       totalScores: this.totalScores,
       roundNumber: this.roundNumber,
       scores: this.players.map(p => p.score),
