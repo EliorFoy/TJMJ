@@ -1181,15 +1181,28 @@ const addLocalTracksToPc = (pc) => {
     try { pc.addTrack(track, localStream.value); } catch(e) {}
   });
 };
-// 重新协商已有PC（开麦/关麦后调用，发送新offer携带音轨变更）
+// 重新协商已有PC（开麦后调用，发送新offer携带音轨变更）
 const renegotiatePc = async (pc, targetIdx) => {
+  if (pc.signalingState !== 'stable') {
+    console.log('[语音] 跳过重协商(信令状态=' + pc.signalingState + ') 对方=' + targetIdx + '，延迟重试...');
+    // 等待stable后重试
+    const check = () => {
+      if (pc.signalingState === 'stable') {
+        renegotiatePc(pc, targetIdx);
+      } else {
+        setTimeout(check, 300);
+      }
+    };
+    setTimeout(check, 500);
+    return;
+  }
   try {
     const offer = await pc.createOffer();
     await pc.setLocalDescription(offer);
     send({ type: 'webrtc_offer', to: targetIdx, data: offer });
     console.log('[语音] 重协商offer已发送 → 对方=' + targetIdx);
   } catch(e) {
-    console.log('[语音] 重协商失败:', e.message);
+    console.log('[语音] 重协商失败:', e.message, 'state=' + pc.signalingState);
   }
 };
 
@@ -1301,13 +1314,25 @@ const handleWebrtcSignal = (msg) => {
         } catch(err) { console.log('[语音] 应答音频失败:', err); }
       };
     }
-    pc.setRemoteDescription(new RTCSessionDescription(data));
-    pc.createAnswer().then(answer => {
-      pc.setLocalDescription(answer);
-      send({ type: 'webrtc_answer', to: from, data: answer });
-    }).catch(console.error);
+    pc.setRemoteDescription(new RTCSessionDescription(data)).then(() => {
+      console.log('[语音] setRemote成功(offer) 来自=' + from);
+      return pc.createAnswer();
+    }).then(answer => {
+      return pc.setLocalDescription(answer);
+    }).then(() => {
+      send({ type: 'webrtc_answer', to: from, data: pc.localDescription });
+      console.log('[语音] answer已发送 → 对方=' + from);
+    }).catch(e => {
+      console.error('[语音] offer处理失败 来自=' + from, e.message);
+    });
   } else if (type === 'webrtc_answer') {
-    if (pc) pc.setRemoteDescription(new RTCSessionDescription(data)).catch(console.error);
+    if (pc) {
+      pc.setRemoteDescription(new RTCSessionDescription(data)).then(() => {
+        console.log('[语音] setRemote成功(answer) 来自=' + from);
+      }).catch(e => {
+        console.error('[语音] setRemote失败(answer) 来自=' + from, e.message);
+      });
+    }
   } else if (type === 'webrtc_ice') {
     if (!pc) {
       // PC尚未创建（offer还在路上），暂存候选
