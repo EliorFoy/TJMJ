@@ -1220,9 +1220,11 @@ const createPeerConnection = (targetIdx, isOfferer = true) => {
       send({ type: 'webrtc_ice', to: targetIdx, data: e.candidate });
     }
   };
-  // 重协商：开麦/关麦后addTrack触发，发送新offer
+  // 重协商：仅在初始offer完成后才响应
+  pc._offerDone = false;
   pc.onnegotiationneeded = () => {
-    console.log('[语音] 协商需求触发: 对方=' + targetIdx);
+    if (!pc._offerDone) return;
+    console.log('[语音] 协商需求: 对方=' + targetIdx);
     renegotiatePc(pc, targetIdx);
   };
   pc.oniceconnectionstatechange = () => {
@@ -1267,7 +1269,12 @@ const createPeerConnection = (targetIdx, isOfferer = true) => {
     pc.createOffer().then(offer => {
       pc.setLocalDescription(offer);
       send({ type: 'webrtc_offer', to: targetIdx, data: offer });
+      pc._offerDone = true;
+      console.log('[语音] 初始offer已发送 → 对方=' + targetIdx);
     }).catch(console.error);
+  } else {
+    // 接收方：等收到offer并发送answer后标记完成
+    pc._offerDone = true; // 非offerer一侧不需要发送初始offer
   }
 };
 
