@@ -317,6 +317,7 @@
           <button class="action-btn peng" :class="{ 'active': actionState.canPeng }" @click="handlePeng">碰</button>
           <button class="action-btn gang" :class="{ 'active': actionState.canGang }" @click="handleGang">杠</button>
           <button class="action-btn hu" :class="{ 'active': actionState.canHu || (gameState.currentPlayerIndex === 0 && gameState.handTiles.length % 3 === 2) }" @click="handleHu">胡</button>
+          <button class="action-btn tuo" :class="{ 'active': tuoguan }" @click="toggleTuoguan" title="托管自动出牌">托</button>
           <button class="action-btn pass active" v-if="actionState.isWaiting" @click="passAction">过</button>
         </div>
 
@@ -355,14 +356,15 @@
 
     <!-- 头像选择器（inline style 强制定位） -->
     <div v-if="showAvatarPicker" @click.self="showAvatarPicker = false" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.35);z-index:2147483647;display:flex;align-items:center;justify-content:center;">
-      <div style="background:#1a1a2e;border:2px solid #ffd700;border-radius:8px;padding:10px;text-align:center;width:200px;">
+      <div style="background:#1a1a2e;border:2px solid #ffd700;border-radius:8px;padding:10px;text-align:center;width:250px;">
         <h3 style="color:#ffd700;margin:0 0 6px;font-size:13px;">选择头像</h3>
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:8px;">
           <img v-for="n in 12" :key="'av'+n" :src="getImg(`avatars/${n}.表情包.png`)" style="width:100%;aspect-ratio:1;border-radius:6px;border:2px solid #444;cursor:pointer;background:#fff;object-fit:cover;" @click="selectPresetAvatar(n)" />
         </div>
-        <div style="display:flex;gap:4px;justify-content:center;">
+        <div style="display:flex;gap:4px;justify-content:center;flex-wrap:wrap;">
           <button style="background:rgba(255,255,255,.15);border:1px solid #555;border-radius:5px;color:#ddd;padding:3px 8px;font-size:11px;cursor:pointer;" @click="pickImageFile">📷 拍照</button>
           <button style="background:rgba(255,255,255,.15);border:1px solid #555;border-radius:5px;color:#ddd;padding:3px 8px;font-size:11px;cursor:pointer;" @click="pickImageFile">📁 图片</button>
+          <button style="background:rgba(0,200,0,.25);border:1px solid #07c160;border-radius:5px;color:#07c160;padding:3px 8px;font-size:11px;cursor:pointer;" @click="pickWechatAvatar">💬 微信</button>
           <button style="background:rgba(255,255,255,.15);border:1px solid #555;border-radius:5px;color:#ddd;padding:3px 8px;font-size:11px;cursor:pointer;" @click="showAvatarPicker = false">取消</button>
         </div>
       </div>
@@ -582,6 +584,17 @@ watch(() => [...gameState.handTiles], (after, before) => {
     console.trace('[DEBUG] handTiles 变化:', before.join(','), '→', after.join(','));
   }
 });
+// 自动弹幕：对局中开启，离开对局关闭
+watch(() => gameState.gamePhase, (phase) => {
+  if (phase === 'PLAYING') startAutoDanmaku();
+  else stopAutoDanmaku();
+});
+// 托管模式：轮到自己时自动出牌
+watch(() => gameState.currentPlayerIndex, () => {
+  if (tuoguan.value && isMyTurn()) {
+    setTimeout(() => tuoguanPlay(), 600);
+  }
+});
 
 // 昵称记忆 & 随机
 const showMemory = ref(false);
@@ -643,6 +656,36 @@ const pickImageFile = () => {
   };
   input.click();
 };
+const pickWechatAvatar = () => {
+  // 尝试微信JS-SDK获取头像（微信内置浏览器中可用）
+  if (typeof wx !== 'undefined' && wx.chooseImage) {
+    wx.chooseImage({
+      count: 1,
+      sizeType: ['compressed'],
+      sourceType: ['album', 'camera'],
+      success: (res) => {
+        const localId = res.localIds[0];
+        if (typeof wx.getLocalImgData === 'function') {
+          wx.getLocalImgData({
+            localId,
+            success: (imgRes) => {
+              applyAvatar(imgRes.localData);
+            }
+          });
+        }
+      },
+      fail: () => { fallbackWechatUrl(); }
+    });
+  } else {
+    fallbackWechatUrl();
+  }
+};
+const fallbackWechatUrl = () => {
+  const url = prompt('请粘贴微信头像图片地址（URL）：', '');
+  if (url && url.trim()) {
+    applyAvatar(url.trim());
+  }
+};
 const selectPresetAvatar = (num) => {
   applyAvatar(`${num}.表情包`);
 };
@@ -698,6 +741,39 @@ const actionState = reactive({
   isWaiting: false, targetTile: null, sourceIndex: -1,
   canChi: false, chiCombinations: [], canPeng: false, canGang: false, canHu: false
 });
+
+// 托管模式：自动出牌
+const tuoguan = ref(false);
+const toggleTuoguan = () => {
+  tuoguan.value = !tuoguan.value;
+  if (tuoguan.value && isMyTurn() && !actionState.isWaiting) {
+    tuoguanPlay();
+  }
+};
+const tuoguanPlay = () => {
+  if (!tuoguan.value || !isMyTurn() || actionState.isWaiting) return;
+  // 能胡就胡
+  if (actionState.canHu) { handleHu(); return; }
+  if (actionState.canGang) { handleGang(); return; }
+  if (actionState.canPeng) { handlePeng(); return; }
+  if (actionState.canChi) { handleChi(); return; }
+  if (actionState.isWaiting) { passAction(); return; }
+  // 自动出牌：用AI策略选择
+  const canDiscard = gameState.handTiles.length % 3 === 2 || gameState.handTiles.length % 3 === 0;
+  if (canDiscard) {
+    const strategy = new NpcStrategy(gameState.handTiles, gameState.wangTile, getMyExposed(), gameState.discards, gameState.deckRemaining);
+    const tile = strategy.chooseDiscard();
+    if (tile != null) {
+      const idx = gameState.handTiles.indexOf(tile);
+      if (idx >= 0) { gameState.selectedTileIndex = idx; setTimeout(() => playTile(idx), 400); }
+    } else {
+      // fallback: random
+      const rand = Math.floor(Math.random() * gameState.handTiles.length);
+      gameState.selectedTileIndex = rand;
+      setTimeout(() => playTile(rand), 400);
+    }
+  }
+};
 
 const getDiscardGridPos = (index) => {
   // 12列×6行网格，中央留空给骰子
@@ -877,6 +953,27 @@ const chatInputRef = ref(null);
 const chatMessages = ref([]); // { id, from, fromName, text }
 let chatMsgId = 0;
 const myPlayerIndexForChat = ref(-1);
+
+// === 自动随机弹幕（每30秒） ===
+const autoDanmakuPhrases = ['一个个不急死哒', '你看咯你看咯', '快点咯'];
+let autoDanmakuTimer = null;
+const startAutoDanmaku = () => {
+  stopAutoDanmaku();
+  // 首条5秒后弹出，之后每30秒
+  setTimeout(() => {
+    if (gameState.gamePhase !== 'PLAYING') return;
+    const phrase = autoDanmakuPhrases[Math.floor(Math.random() * autoDanmakuPhrases.length)];
+    addChatMessage({ id: ++chatMsgId, from: -1, fromName: '系统', text: phrase });
+  }, 5000);
+  autoDanmakuTimer = setInterval(() => {
+    if (gameState.gamePhase !== 'PLAYING') return;
+    const phrase = autoDanmakuPhrases[Math.floor(Math.random() * autoDanmakuPhrases.length)];
+    addChatMessage({ id: ++chatMsgId, from: -1, fromName: '系统', text: phrase });
+  }, 30000);
+};
+const stopAutoDanmaku = () => {
+  if (autoDanmakuTimer) { clearInterval(autoDanmakuTimer); autoDanmakuTimer = null; }
+};
 
 const toggleChat = () => {
   showChatInput.value = !showChatInput.value;
@@ -1599,10 +1696,10 @@ const startRound = () => {
 };
 
 const physicalDraw = () => {
-  if (gameState.drawCursor === gameState.diIndex) gameState.drawCursor = (gameState.drawCursor + 1) % 108;
+  // 地牌（扳王翻开的那张）也可被正常摸走，不再跳过
   const tile = gameState.wallTiles[gameState.drawCursor];
-  gameState.wallTiles[gameState.drawCursor] = null; 
-  gameState.drawCursor = (gameState.drawCursor + 1) % 108; 
+  gameState.wallTiles[gameState.drawCursor] = null;
+  gameState.drawCursor = (gameState.drawCursor + 1) % 108;
   gameState.deckRemaining--;
   return tile;
 };
@@ -2379,7 +2476,7 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .showdown-name.winner-name { color: #ffd700; font-weight: bold; text-shadow: 0 0 6px rgba(255,215,0,0.5); }
 
 /* 删掉原来的结算相关样式 */
-.showdown-tile-bg { position: absolute; width: 100%; height: 100%; z-index: 0; transform: translateX(-15px); }
+.showdown-tile-bg { position: absolute; width: 100%; height: 100%; z-index: 0; transform: translateX(-10px); }
 .showdown-tile-face { position: absolute; top: 1px; left: 85%; transform: translate(-35%); width: 19px; height: 26px; z-index: 2; }
 .showdown-score { font-size: 14px; font-weight: bold; min-width: 45px; text-align: right; }
 .showdown-round { font-size: 13px; margin: 8px 0; color: #aaa; }
@@ -2462,7 +2559,9 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 .action-btn { width: 44px; height: 44px; border-radius: 50%; background: #555; border: 2px solid #333; color: #aaa; display: flex; justify-content: center; align-items: center; font-weight: bold; font-size: 16px; transition: 0.3s; cursor: pointer; -webkit-appearance: none; padding: 0; outline: none; }
 .action-btn.active { background: linear-gradient(145deg, #ffcc00, #ff9900); border-color: #fff; color: #fff; cursor: pointer; box-shadow: 0 4px 10px rgba(255,215,0,0.5); }
 .action-btn.active:active { transform: scale(0.9); }
-.action-btn.pass.active { background: linear-gradient(145deg, #66bb6a, #43a047); } 
+.action-btn.pass.active { background: linear-gradient(145deg, #66bb6a, #43a047); }
+.action-btn.tuo { background: #444; border-color: #666; color: #aaa; }
+.action-btn.tuo.active { background: linear-gradient(145deg, #9c27b0, #7b1fa2); border-color: #ce93d8; color: #fff; box-shadow: 0 4px 10px rgba(156,39,176,0.5); }
 
 /* 中央区域：骰子+弃牌池 — 调 top 的百分比整体上下移动 */
 .center-area { position: absolute; top: 52%; left: 50%; transform: translate(-50%, -50%); width: 340px; height: 230px; z-index: 2; }
@@ -2592,10 +2691,10 @@ input, button, .clickable, .action-btn.active, .emoji-option { cursor: pointer; 
 
 /* ===== 弹幕聊天层 ===== */
 .danmaku-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999; overflow: hidden; }
-.danmaku-item { position: absolute; white-space: nowrap; font-size: 16px; font-weight: bold; color: #fff; text-shadow: 0 0 4px #000, 0 0 8px #000; animation: danmakuScroll linear forwards; right: 100%; }
+.danmaku-item { position: absolute; white-space: nowrap; font-size: 16px; font-weight: bold; color: #fff; text-shadow: 0 0 4px #000, 0 0 8px #000; animation: danmakuScroll linear forwards; left: 0; transform: translateX(-100%); }
 .danmaku-name { color: #ffd700; margin-right: 4px; }
 .danmaku-text { color: #fff; }
-@keyframes danmakuScroll { from { transform: translateX(0); } to { transform: translateX(calc(100vw + 100%)); } }
+@keyframes danmakuScroll { from { transform: translateX(-100%); } to { transform: translateX(110vw); } }
 
 /* ===== 聊天输入栏 ===== */
 .chat-input-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 99999; background: rgba(0,0,0,0.9); padding: 10px 12px; display: flex; gap: 8px; align-items: center; }

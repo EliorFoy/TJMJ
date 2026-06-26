@@ -169,7 +169,7 @@ export class GameRoom {
   }
 
   physicalDraw() {
-    if (this.drawCursor === this.diIndex) this.drawCursor = (this.drawCursor + 1) % 108;
+    // 地牌（扳王翻开的那张）也可被正常摸走，不再跳过
     const tile = this.wallTiles[this.drawCursor];
     this.wallTiles[this.drawCursor] = null;
     this.drawCursor = (this.drawCursor + 1) % 108;
