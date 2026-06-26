@@ -595,6 +595,12 @@ watch(() => gameState.currentPlayerIndex, () => {
     setTimeout(() => tuoguanPlay(), 600);
   }
 });
+// 托管模式：有人打出牌后自动响应吃碰杠胡
+watch(() => actionState.isWaiting, (waiting) => {
+  if (tuoguan.value && waiting) {
+    setTimeout(() => tuoguanPlay(), 500);
+  }
+});
 
 // 昵称记忆 & 随机
 const showMemory = ref(false);
