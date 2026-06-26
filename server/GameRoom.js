@@ -222,10 +222,13 @@ export class GameRoom {
     try {
       console.log(`[服务器] handleAction: p${playerIndex} ${actionType} combo=${combo} pending=${!!this.pendingActions}`);
       // 自摸胡牌不受 pendingActions 限制（玩家摸牌后可直接胡）
-      if (!this.pendingActions && actionType !== 'hu') return;
+      if (!this.pendingActions && actionType !== 'hu') {
+        this.sendTo(playerIndex, { type: 'error', message: '操作超时，已进入下一回合' });
+        return;
+      }
       const pa = this.pendingActions;
       if (pa && (!pa.actions || !pa.actions[actionType])) {
-        if (actionType !== 'hu') { console.log('[服务器] 无效操作'); return; }
+        if (actionType !== 'hu') { this.sendTo(playerIndex, { type: 'error', message: '无效操作' }); return; }
       }
 
       pa.actionResponded++;
@@ -292,16 +295,22 @@ export class GameRoom {
     if (actions.chi !== null) relevantPlayers.add(actions.chi);
 
     const responderCount = relevantPlayers.size;
-    // 超时自动跳过（10 秒未响应则强制清除，防止断线卡死）
+    // 超时处理：15秒内未全部响应，根据已有响应裁决（而非粗暴跳过）
     const timeoutId = setTimeout(() => {
-      // 超时直接重置，不管引用是否匹配
-      if (this.pendingActions) {
-        console.log('[服务器] 操作超时，强制跳过 pendingActions');
-        this.pendingActions = null;
-        this.nextTurn();
+      if (this.pendingActions === pendingRef) {
+        console.log('[服务器] 操作超时，已有响应=' + this.pendingActions.actionResponded + '/' + responderCount);
+        // 有玩家已响应：按已有结果裁决
+        if (this.pendingActions.actionResponded > 0) {
+          this.resolveActions();
+        } else {
+          // 完全无人响应才跳过
+          this.pendingActions = null;
+          this.nextTurn();
+        }
       }
-    }, 10000);
-    this.pendingActions = { actions, actionResponded: 0, actionResults: [], responderCount, timeoutId };
+    }, 15000);
+    const pendingRef = { actions, actionResponded: 0, actionResults: [], responderCount, timeoutId };
+    this.pendingActions = pendingRef;
 
     relevantPlayers.forEach(p => {
       this.sendTo(p, {
@@ -368,6 +377,8 @@ export class GameRoom {
     this.exposed[playerIndex].push({ type: 'peng', tiles: [tile, tile, tile] });
     this.currentPlayerIndex = playerIndex;
     this.broadcastPublic();
+    // 通知碰牌玩家出牌
+    this.sendTo(playerIndex, { type: 'your_turn', playerIndex });
   }
 
   executeGang(playerIndex, tile) {
@@ -381,9 +392,9 @@ export class GameRoom {
     if (this.deckRemaining > 4) {
       const newTile = this.physicalDraw();
       this.hands[playerIndex].push(newTile);
-      this.hands[playerIndex].sort((a, b) => a - b);
       this.sendTo(playerIndex, { type: 'drew_tile', tile: newTile });
     }
+    this.sendTo(playerIndex, { type: 'your_turn', playerIndex });
   }
 
   executeChi(playerIndex, tile, combo) {
@@ -400,6 +411,8 @@ export class GameRoom {
     this.exposed[playerIndex].push({ type: 'chi', tiles: chiTiles });
     this.currentPlayerIndex = playerIndex;
     this.broadcastPublic();
+    // 通知吃牌玩家出牌
+    this.sendTo(playerIndex, { type: 'your_turn', playerIndex });
   }
 
   nextTurn() {
