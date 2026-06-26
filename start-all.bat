@@ -68,7 +68,8 @@ pause > nul
 :: =============================================
 :: 1. Game Server (start first)
 :: =============================================
-start "TJMJ-GameServer" cmd /k "cd /d "%ROOT%server" && echo. && echo ============================================ && echo   TJMJ Game Server WebSocket:8080 && echo ============================================ && echo. && npm run dev"
+set "AGORA_APP_CERT=d9245838ca4a42a18e1a9e1517c05974"
+start "TJMJ-GameServer" cmd /k "cd /d "%ROOT%server" && set AGORA_APP_CERT=%AGORA_APP_CERT% && echo. && echo ============================================ && echo   TJMJ Game Server WebSocket:8080 && echo. && echo   Agora Token: ENABLED && echo ============================================ && echo. && npm run dev"
 
 :: Wait for server to boot
 echo   Waiting for game server (3s)...
